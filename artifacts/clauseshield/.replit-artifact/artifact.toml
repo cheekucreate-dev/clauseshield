@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "ClauseShield"
+description = "A contract risk auditing dashboard that turns uploaded PDFs into plain-English findings and negotiation-ready counter-clauses."
+version = "1.0.0"
+id = "artifacts/clauseshield"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23703
+
+[services.development]
+run = "pnpm --filter @workspace/clauseshield run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/clauseshield", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/clauseshield/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23703"
+BASE_PATH = "/"
