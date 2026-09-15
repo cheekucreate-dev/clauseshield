@@ -1,0 +1,1 @@
+- [ClauseShield routing](clauseshield-routing.md) — the app must retain ownership of the `/api` prefix so uploads reach its Express server.

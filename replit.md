@@ -1,10 +1,11 @@
-# [Project name]
+# ClauseShield
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+ClauseShield audits uploaded contract PDFs for common business traps and returns plain-English risks with negotiation-ready counter-clauses.
 
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/clauseshield run dev` — run the ClauseShield web app and Express API
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
@@ -22,23 +23,26 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/clauseshield/index.js` — Express server, PDF extraction, OpenAI audit, and `/api/analyze`
+- `artifacts/clauseshield/public/index.html` — self-contained Tailwind dashboard served by Express
+- `artifacts/clauseshield/.replit-artifact/artifact.toml` — app routing and development/production service configuration
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Contract PDFs are held in memory for the duration of a request and are not persisted.
+- The audit response is requested and validated as strict JSON before it reaches the client.
+- The dashboard is served as a standalone HTML file so the `/api/analyze` endpoint and UI share one Express origin.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
-
-## User preferences
-
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Uploads PDF contracts using drag and drop or a file picker.
+- Audits unlimited indemnification/liability, predatory payment terms, IP overreach, kill fees, and non-competes.
+- Shows a 0–100 risk score, summary, issue cards, exact clause quotes, plain-English risks, and copyable counter-clauses.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- ClauseShield owns the `/api` route prefix; the generic API scaffold is mapped to `/system-api` to avoid proxy collisions.
+- `OPENAI_API_KEY` must be present in Replit Secrets for audits to run.
 
 ## Pointers
 

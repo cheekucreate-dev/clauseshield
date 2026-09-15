@@ -1,61 +1,457 @@
-import { type ReactNode } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ErrorBoundary } from '@/components/error-boundary';
-import { Toaster } from '@/components/ui/toaster';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import NotFound from '@/pages/not-found';
+import { useRef, useState } from 'react';
 import {
-  Route,
-  Switch,
-  useLocation,
-  Router as WouterRouter,
-} from 'wouter';
+  AlertTriangle,
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  CircleAlert,
+  Copy,
+  FileText,
+  Info,
+  LockKeyhole,
+  RotateCcw,
+  ScanSearch,
+  ShieldAlert,
+  ShieldCheck,
+  Sparkles,
+  UploadCloud,
+  X,
+} from 'lucide-react';
 
-const queryClient = new QueryClient();
+type Issue = {
+  trap_category?: string;
+  severity?: string;
+  clause_quote?: string;
+  plain_english_risk?: string;
+  counter_clause?: string;
+};
 
-function Home() {
+type AuditResult = {
+  contract_summary?: string;
+  overall_risk_score?: number;
+  issues_detected?: Issue[];
+};
+
+const severityStyle: Record<string, { color: string; background: string; border: string; icon: typeof CircleAlert }> = {
+  critical: { color: '#a74336', background: '#fbe9e4', border: '#efc2b8', icon: ShieldAlert },
+  high: { color: '#b15c3f', background: '#fdf0e7', border: '#f1d2bb', icon: AlertTriangle },
+  medium: { color: '#92702c', background: '#fbf4dc', border: '#ead9a5', icon: CircleAlert },
+  low: { color: '#2b766c', background: '#e5f2ee', border: '#b9dbd2', icon: CheckCircle2 },
+};
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function severityKey(value?: string) {
+  const normalized = (value || 'medium').toLowerCase();
+  if (normalized.includes('critical')) return 'critical';
+  if (normalized.includes('high')) return 'high';
+  if (normalized.includes('low')) return 'low';
+  return 'medium';
+}
+
+function riskLabel(score: number) {
+  if (score >= 75) return { label: 'High exposure', detail: 'Several clauses deserve attention before you sign.' };
+  if (score >= 45) return { label: 'Worth a closer look', detail: 'A few terms could use clarification or a counter.' };
+  return { label: 'Lower exposure', detail: 'No major traps surfaced in this first pass.' };
+}
+
+function BrandMark() {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Replit Agent is building...
-        </h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Your app will appear here once it's ready.
-        </p>
+    <div className="flex items-center gap-3">
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#226960] text-[#f8f6ed] shadow-sm">
+        <ShieldCheck size={20} strokeWidth={2.2} />
+      </div>
+      <div>
+        <div className="text-[15px] font-extrabold tracking-[-0.04em] text-[#202e2d]">ClauseShield</div>
+        <div className="mono text-[9px] uppercase tracking-[.16em] text-[#68807a]">Your second set of eyes</div>
       </div>
     </div>
   );
 }
 
-function Router() {
+function Header({ onReset, hasResult }: { onReset: () => void; hasResult: boolean }) {
   return (
-    // Keep a shared shell (sidebar, navbar) outside the boundary so it
-    // survives a page crash.
-    <RoutedErrorBoundary>
-      <Switch>
-        <Route path="/" component={Home} />
-        <Route component={NotFound} />
-      </Switch>
-    </RoutedErrorBoundary>
+    <header className="content-layer mx-auto flex w-full max-w-[1240px] items-center justify-between px-5 py-5 sm:px-8 lg:px-10">
+      <BrandMark />
+      <div className="flex items-center gap-3">
+        {hasResult && (
+          <button
+            type="button"
+            onClick={onReset}
+            data-testid="button-header-new-audit"
+            className="ghost-button hidden items-center gap-2 rounded-full px-3 py-2 text-xs font-bold text-[#64736e] sm:flex"
+          >
+            <RotateCcw size={14} /> New audit
+          </button>
+        )}
+        <div className="hidden items-center gap-2 rounded-full border border-[#d8e3dc] bg-[#f6faf6]/70 px-3 py-2 text-[11px] font-bold text-[#4d6f67] sm:flex">
+          <LockKeyhole size={13} />
+          <span>Private by design</span>
+        </div>
+      </div>
+    </header>
   );
 }
 
-function RoutedErrorBoundary({ children }: { children: ReactNode }) {
-  const [location] = useLocation();
-  return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
+function EmptyState({ onSelect }: { onSelect: () => void }) {
+  return (
+    <div className="fade-up">
+      <div className="mb-12 max-w-[720px]">
+        <div className="eyebrow mb-5 flex items-center gap-2"><span className="h-px w-7 bg-[#226960]" />Contract risk audit</div>
+        <h1 className="serif max-w-[680px] text-[clamp(2.85rem,7vw,5.6rem)] leading-[.98] tracking-[-.055em] text-[#213532]">
+          Read the fine print<br /><em className="text-[#c96b52] not-italic">with your eyes open.</em>
+        </h1>
+        <p className="mt-7 max-w-[520px] text-[15px] leading-7 text-[#65736f] sm:text-[17px]">
+          Upload a contract and get a plain-English read on the clauses that could cost you time, money, or control.
+        </p>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <UploadCard onSelect={onSelect} />
+        <aside className="rounded-[22px] border border-[#deded4] bg-[#f2f1e8]/75 p-6 lg:mt-10">
+          <div className="mb-6 flex h-10 w-10 items-center justify-center rounded-xl bg-[#dfece5] text-[#226960]">
+            <ScanSearch size={19} />
+          </div>
+          <h2 className="text-[14px] font-extrabold tracking-[-.02em] text-[#2c403c]">What we look for</h2>
+          <ul className="mt-5 space-y-4">
+            {['Payment and late-fee traps', 'Rights you may be giving away', 'One-sided exit terms'].map((item) => (
+              <li key={item} className="flex gap-3 text-[12px] leading-5 text-[#6d7975]">
+                <CheckCircle2 className="mt-0.5 shrink-0 text-[#6a9b8d]" size={15} /> {item}
+              </li>
+            ))}
+          </ul>
+          <div className="mt-7 border-t border-[#dbddd3] pt-5 text-[11px] leading-5 text-[#7a837e]">
+            A useful first pass — not a substitute for advice from a qualified attorney.
+          </div>
+        </aside>
+      </div>
+
+      <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3 text-[11px] font-semibold text-[#7c8781]">
+        <span className="flex items-center gap-2"><LockKeyhole size={13} className="text-[#226960]" /> Your file is used for this audit only</span>
+        <span className="flex items-center gap-2"><FileText size={13} className="text-[#226960]" /> PDF files up to 20 MB</span>
+      </div>
+    </div>
+  );
+}
+
+function UploadCard({ onSelect }: { onSelect: () => void }) {
+  const [dragging, setDragging] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div
+      className={`drop-zone relative flex min-h-[285px] flex-col items-center justify-center rounded-[22px] border border-dashed border-[#bfcfc6] bg-[#fbfbf7]/80 px-6 py-10 text-center ${dragging ? 'dragging' : ''}`}
+      onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={(event) => {
+        event.preventDefault();
+        setDragging(false);
+        const file = event.dataTransfer.files[0];
+        if (file) onSelectWithFile(file, onSelect);
+      }}
+      data-testid="dropzone-contract"
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        data-testid="input-contract-file"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) onSelectWithFile(file, onSelect);
+        }}
+      />
+      <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e3f0eb] text-[#226960]">
+        <UploadCloud size={25} strokeWidth={1.8} />
+      </div>
+      <div className="text-[15px] font-extrabold text-[#334641]">Drop your PDF here</div>
+      <div className="mt-2 text-[12px] text-[#87928d]">or choose a file from your computer</div>
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        data-testid="button-choose-contract"
+        className="primary-button mt-6 inline-flex items-center gap-2 rounded-full bg-[#226960] px-5 py-3 text-[12px] font-extrabold text-[#f7f5ec]"
+      >
+        Choose PDF <ArrowRight size={15} />
+      </button>
+    </div>
+  );
+}
+
+function onSelectWithFile(file: File, onSelect: () => void) {
+  const input = document.querySelector<HTMLInputElement>('[data-testid="input-contract-file"]');
+  if (input) {
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    input.files = transfer.files;
+  }
+  onSelect();
+}
+
+function FilePreview({ file, onRemove }: { file: File; onRemove: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#c6ded5] bg-[#edf6f1] px-4 py-3.5">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#d4ebe2] text-[#226960]"><FileText size={18} /></div>
+        <div className="min-w-0 text-left">
+          <div className="truncate text-[13px] font-extrabold text-[#304541]">{file.name}</div>
+          <div className="mono mt-1 text-[10px] text-[#6c8980]">{formatBytes(file.size)} · PDF document</div>
+        </div>
+      </div>
+      <button type="button" onClick={onRemove} data-testid="button-remove-contract" className="ghost-button rounded-full p-2 text-[#77938a]" aria-label="Remove selected contract">
+        <X size={16} />
+      </button>
+    </div>
+  );
+}
+
+function LoadingAudit({ fileName }: { fileName: string }) {
+  return (
+    <div className="fade-up mx-auto max-w-[700px] py-14 text-center sm:py-24">
+      <div className="relative mx-auto mb-9 flex h-24 w-24 items-center justify-center rounded-[28px] border border-[#c4ddd4] bg-[#e7f2ed] text-[#226960]">
+        <ShieldCheck size={42} strokeWidth={1.4} />
+        <span className="pulse-dot absolute -right-1 -top-1 h-3 w-3 rounded-full bg-[#c96b52]" />
+      </div>
+      <div className="eyebrow">Audit in progress</div>
+      <h1 className="serif mt-4 text-4xl tracking-[-.04em] text-[#283d38] sm:text-5xl">Looking between the lines.</h1>
+      <p className="mx-auto mt-4 max-w-[430px] text-sm leading-6 text-[#72807b]">
+        ClauseShield is mapping the important parts of <span className="font-bold text-[#4d6760]">{fileName}</span> into a clearer picture.
+      </p>
+      <div className="mx-auto mt-10 max-w-[420px] overflow-hidden rounded-full bg-[#dbe7e0]">
+        <div className="audit-line h-1.5 w-full bg-[#c96b52]" />
+      </div>
+      <div className="mt-4 flex items-center justify-center gap-2 text-[11px] font-semibold text-[#87928d]">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#c96b52]" /> Checking payment, ownership, exit, and liability clauses
+      </div>
+    </div>
+  );
+}
+
+function ScoreCard({ score, issueCount }: { score: number; issueCount: number }) {
+  const safeScore = Math.max(0, Math.min(100, score));
+  const circumference = 2 * Math.PI * 45;
+  const risk = riskLabel(safeScore);
+  return (
+    <div className="flex flex-col items-center justify-center rounded-[24px] bg-[#226960] px-6 py-8 text-center text-[#f5f5eb] sm:min-h-[280px]">
+      <div className="relative h-[142px] w-[142px]">
+        <svg viewBox="0 0 110 110" className="score-ring h-full w-full" aria-hidden="true">
+          <circle cx="55" cy="55" r="45" stroke="rgba(239,245,236,.18)" strokeWidth="7" />
+          <circle cx="55" cy="55" r="45" stroke="#f1b29e" strokeWidth="7" strokeDasharray={circumference} strokeDashoffset={circumference - (circumference * safeScore) / 100} />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="serif text-[43px] leading-none">{safeScore}</span>
+          <span className="mono mt-1 text-[9px] uppercase tracking-[.14em] text-[#b7d4cb]">risk score</span>
+        </div>
+      </div>
+      <div className="mt-2 text-[15px] font-extrabold">{risk.label}</div>
+      <div className="mt-1 max-w-[210px] text-[11px] leading-5 text-[#c4ddd5]">{issueCount} {issueCount === 1 ? 'item' : 'items'} surfaced for your attention</div>
+    </div>
+  );
+}
+
+function IssueCard({ issue, index, onCopy, copied }: { issue: Issue; index: number; onCopy: (text: string, index: number) => void; copied: boolean }) {
+  const severity = severityKey(issue.severity);
+  const style = severityStyle[severity];
+  const SeverityIcon = style.icon;
+  return (
+    <article className="issue-card rounded-[22px] border border-[#e0ded4] bg-[#fffefa] p-5 sm:p-6" data-testid={`card-issue-${index}`}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[.09em]" style={{ color: style.color, background: style.background, borderColor: style.border }}>
+            <SeverityIcon size={12} /> {severity}
+          </span>
+          <span className="rounded-full bg-[#f1f0e8] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.08em] text-[#78827d]">{issue.trap_category || 'Contract term'}</span>
+        </div>
+        <span className="mono text-[10px] text-[#a0a6a0]">ISSUE {String(index + 1).padStart(2, '0')}</span>
+      </div>
+      <blockquote className="mt-5 border-l-2 border-[#ddad9c] pl-4 text-[14px] italic leading-6 text-[#53625d]">
+        “{issue.clause_quote || 'A clause in this contract needs a closer look.'}”
+      </blockquote>
+      <div className="mt-6 grid gap-5 md:grid-cols-2">
+        <div>
+          <div className="mono text-[9px] font-medium uppercase tracking-[.13em] text-[#a06a5b]">Why it matters</div>
+          <p className="mt-2 text-[13px] leading-6 text-[#596863]">{issue.plain_english_risk || 'This wording may create an obligation or risk that is easy to miss on a quick read.'}</p>
+        </div>
+        <div className="rounded-2xl bg-[#edf5f0] p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="mono text-[9px] font-medium uppercase tracking-[.13em] text-[#4e8074]">A fairer counter</div>
+            <button
+              type="button"
+              onClick={() => onCopy(issue.counter_clause || '', index)}
+              data-testid={`button-copy-counter-${index}`}
+              className="ghost-button inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] font-extrabold text-[#4d7f74]"
+            >
+              {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          <p className="mt-2 text-[12px] leading-5 text-[#44655d]">{issue.counter_clause || 'Ask for language that keeps the obligation mutual, specific, and time-bound.'}</p>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function Results({ result, file, onReset }: { result: AuditResult; file: File; onReset: () => void }) {
+  const [copied, setCopied] = useState<number | null>(null);
+  const issues = Array.isArray(result.issues_detected) ? result.issues_detected : [];
+  const score = Number.isFinite(Number(result.overall_risk_score)) ? Number(result.overall_risk_score) : 0;
+  const copyCounter = (text: string, index: number) => {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(index);
+      window.setTimeout(() => setCopied(null), 1800);
+    }).catch(() => undefined);
+  };
+  return (
+    <div className="fade-up">
+      <div className="mb-9 flex flex-wrap items-end justify-between gap-5">
+        <div>
+          <div className="eyebrow mb-3 flex items-center gap-2"><span className="h-px w-7 bg-[#226960]" />Audit complete</div>
+          <h1 className="serif text-[clamp(2.7rem,6vw,4.6rem)] leading-[.98] tracking-[-.055em] text-[#213532]">Here’s what stood out.</h1>
+          <div className="mt-4 flex items-center gap-2 text-[12px] text-[#7a8580]"><FileText size={14} className="text-[#226960]" /> {file.name} <span className="text-[#b8bdb7]">·</span> {formatBytes(file.size)}</div>
+        </div>
+        <button type="button" onClick={onReset} data-testid="button-reset-audit" className="ghost-button inline-flex items-center gap-2 rounded-full border border-[#d5ddd6] bg-[#fafbf6] px-4 py-2.5 text-xs font-extrabold text-[#557069]">
+          <RotateCcw size={14} /> Re-audit another contract
+        </button>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <ScoreCard score={score} issueCount={issues.length} />
+        <div className="soft-shadow rounded-[24px] border border-[#e0ded4] bg-[#fffefa] p-6 sm:p-8">
+          <div className="flex items-center gap-2 text-[#226960]"><Sparkles size={16} /><span className="mono text-[10px] uppercase tracking-[.14em]">Plain-English summary</span></div>
+          <p className="serif mt-5 max-w-[740px] text-[23px] leading-[1.35] tracking-[-.02em] text-[#384b46] sm:text-[28px]">
+            {result.contract_summary || 'Your audit is ready. Review the flagged terms below and consider asking for clearer, more balanced language.'}
+          </p>
+          <div className="mt-7 flex items-start gap-3 border-t border-[#ece9df] pt-5 text-[11px] leading-5 text-[#7c8781]">
+            <Info size={15} className="mt-0.5 shrink-0 text-[#c96b52]" />
+            ClauseShield highlights patterns, not legal conclusions. Use these notes to start a better conversation.
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-12 flex items-end justify-between gap-4 border-b border-[#dfded5] pb-4">
+        <div>
+          <div className="eyebrow">Attention points</div>
+          <h2 className="mt-2 text-xl font-extrabold tracking-[-.03em] text-[#314640]">Terms to take to the table</h2>
+        </div>
+        <span className="mono text-[10px] text-[#8a938e]">{issues.length} FOUND</span>
+      </div>
+
+      {issues.length > 0 ? (
+        <div className="mt-5 space-y-4">
+          {issues.map((issue, index) => <IssueCard key={`${issue.trap_category}-${index}`} issue={issue} index={index} onCopy={copyCounter} copied={copied === index} />)}
+        </div>
+      ) : (
+        <div className="mt-5 rounded-[22px] border border-[#c8ded5] bg-[#edf6f1] p-8 text-center">
+          <CheckCircle2 className="mx-auto text-[#317a6e]" size={30} />
+          <h3 className="mt-4 font-extrabold text-[#31574e]">No obvious traps surfaced</h3>
+          <p className="mx-auto mt-2 max-w-[420px] text-sm leading-6 text-[#6a8179]">That’s encouraging. Still, a qualified attorney can spot context-specific concerns that an automated first pass may miss.</p>
+        </div>
+      )}
+      <div className="mt-10 flex justify-center"><button type="button" onClick={onReset} data-testid="button-bottom-new-audit" className="primary-button inline-flex items-center gap-2 rounded-full bg-[#226960] px-5 py-3 text-xs font-extrabold text-[#f7f5ec]">Audit another contract <ArrowRight size={15} /></button></div>
+    </div>
+  );
 }
 
 function App() {
+  const [file, setFile] = useState<File | null>(null);
+  const [result, setResult] = useState<AuditResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const selectFile = () => {
+    const input = document.querySelector<HTMLInputElement>('[data-testid="input-contract-file"]');
+    if (input) {
+      const fileFromInput = input.files?.[0];
+      if (fileFromInput) {
+        if (fileFromInput.type !== 'application/pdf' && !fileFromInput.name.toLowerCase().endsWith('.pdf')) {
+          setError('Please choose a PDF file. ClauseShield reads contracts in PDF format for now.');
+          setFile(null);
+          return;
+        }
+        if (fileFromInput.size > 20 * 1024 * 1024) {
+          setError('That PDF is over the 20 MB limit. Try exporting a smaller copy and upload again.');
+          setFile(null);
+          return;
+        }
+        setError('');
+        setFile(fileFromInput);
+      }
+    }
+  };
+
+  const reset = () => {
+    setFile(null);
+    setResult(null);
+    setError('');
+    const input = document.querySelector<HTMLInputElement>('[data-testid="input-contract-file"]');
+    if (input) input.value = '';
+  };
+
+  const analyze = async () => {
+    if (!file) return;
+    setLoading(true);
+    setError('');
+    try {
+      const formData = new FormData();
+      formData.append('contract', file);
+      const response = await fetch('/api/analyze', { method: 'POST', body: formData });
+      if (!response.ok) {
+        let message = 'We could not complete this audit. Please try again.';
+        try {
+          const body = await response.json() as { message?: string; error?: string };
+          message = body.message || body.error || message;
+        } catch {
+          // Keep the useful fallback for non-JSON server errors.
+        }
+        throw new Error(message);
+      }
+      const body = await response.json() as AuditResult;
+      setResult(body);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Something went wrong while auditing your contract.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <div className="app-shell">
+      <Header onReset={reset} hasResult={Boolean(result)} />
+      <main className="content-layer mx-auto w-full max-w-[1240px] px-5 pb-16 pt-9 sm:px-8 sm:pb-24 sm:pt-16 lg:px-10">
+        {loading ? <LoadingAudit fileName={file?.name || 'your contract'} /> : result && file ? <Results result={result} file={file} onReset={reset} /> : (
+          <div>
+            <EmptyState onSelect={selectFile} />
+            {file && (
+              <div className="mx-auto mt-6 max-w-[940px]">
+                <FilePreview file={file} onRemove={reset} />
+                <div className="mt-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
+                  <span className="flex items-center justify-center gap-2 text-[11px] text-[#7c8781]"><CheckCircle2 size={14} className="text-[#317a6e]" /> Ready for a focused first pass</span>
+                  <button type="button" onClick={analyze} disabled={!file} data-testid="button-analyze-contract" className="primary-button inline-flex items-center justify-center gap-2 rounded-full bg-[#c96b52] px-6 py-3.5 text-[12px] font-extrabold text-[#fff8f1]">
+                    Analyze contract <ArrowRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+            {error && (
+              <div role="alert" data-testid="status-analyze-error" className="mx-auto mt-6 flex max-w-[940px] items-start gap-3 rounded-2xl border border-[#edc8bf] bg-[#fff1ed] px-4 py-3.5 text-[12px] leading-5 text-[#9a4d3d]">
+                <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                <span>{error}</span>
+                <button type="button" onClick={() => setError('')} data-testid="button-dismiss-error" className="ml-auto rounded p-1 text-[#b76c5d]"><X size={15} /></button>
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+      <footer className="content-layer mx-auto flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-4 border-t border-[#dddcd2] px-5 py-6 text-[10px] text-[#8b948e] sm:px-8 lg:px-10">
+        <span className="mono tracking-[.08em]">CLAUSESHIELD / PRIVATE CONTRACT REVIEW</span>
+        <span className="flex items-center gap-2"><LockKeyhole size={12} /> Not legal advice · Built for clearer conversations</span>
+      </footer>
+    </div>
   );
 }
 

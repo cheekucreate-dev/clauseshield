@@ -8,20 +8,27 @@ router = "path"
 
 [[services]]
 name = "web"
-paths = [ "/" ]
+paths = [ "/", "/api" ]
 localPort = 23703
 
 [services.development]
 run = "pnpm --filter @workspace/clauseshield run dev"
 
-[services.production]
-build = [ "pnpm", "--filter", "@workspace/clauseshield", "run", "build" ]
-serve = "static"
-publicDir = "artifacts/clauseshield/dist/public"
+[services.production.build]
+args = ["pnpm", "--filter", "@workspace/clauseshield", "run", "build"]
 
-[[services.production.rewrites]]
-from = "/*"
-to = "/index.html"
+[services.production.build.env]
+NODE_ENV = "production"
+
+[services.production.run]
+args = ["node", "artifacts/clauseshield/index.js"]
+
+[services.production.run.env]
+PORT = "23703"
+NODE_ENV = "production"
+
+[services.production.health.startup]
+path = "/api/health"
 
 [services.env]
 PORT = "23703"

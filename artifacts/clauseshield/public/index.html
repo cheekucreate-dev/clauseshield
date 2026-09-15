@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ClauseShield — Contract risk audit</title>
+    <meta name="description" content="ClauseShield reads the fine print and surfaces contract terms worth a closer look." />
+    <meta name="theme-color" content="#226960" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23226960'/%3E%3Cpath d='M32 53S49 44 49 31V13L32 7 15 13v18c0 13 17 22 17 22Z' fill='none' stroke='%23f8f6ed' stroke-width='5'/%3E%3Cpath d='m24 31 5 5 11-12' fill='none' stroke='%23f1b29e' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Manrope', 'sans-serif'],
+              serif: ['Playfair Display', 'Georgia', 'serif'],
+              mono: ['DM Mono', 'monospace'],
+            },
+          },
+        },
+      };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --ink: #213532;
+        --muted: #65736f;
+        --teal: #226960;
+        --coral: #c96b52;
+        --paper: #f6f4ec;
+        --card: #fffefa;
+        --line: #deded4;
+      }
+      * { box-sizing: border-box; }
+      html { min-width: 320px; scroll-behavior: smooth; }
+      body {
+        min-width: 320px;
+        min-height: 100vh;
+        margin: 0;
+        background:
+          radial-gradient(circle at 81% 7%, rgba(201, 107, 82, .11), transparent 24rem),
+          radial-gradient(circle at 4% 46%, rgba(34, 105, 96, .07), transparent 25rem),
+          var(--paper);
+        color: var(--ink);
+        font-family: 'Manrope', sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      body::before {
+        position: fixed;
+        z-index: 0;
+        inset: 0;
+        content: "";
+        opacity: .24;
+        pointer-events: none;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.035'/%3E%3C/svg%3E");
+      }
+      button { cursor: pointer; font: inherit; }
+      button:disabled { cursor: not-allowed; opacity: .45; }
+      .content-layer { position: relative; z-index: 1; }
+      .serif { font-family: 'Playfair Display', Georgia, serif; }
+      .mono { font-family: 'DM Mono', monospace; }
+      .eyebrow { color: var(--teal); font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; }
+      .soft-shadow { box-shadow: 0 22px 70px rgba(51, 59, 51, .08), 0 2px 4px rgba(51, 59, 51, .04); }
+      .drop-zone { transition: border-color .2s ease, background-color .2s ease, transform .2s ease; }
+      .drop-zone:hover, .drop-zone.dragging { border-color: var(--teal); background-color: rgba(34, 105, 96, .055); }
+      .drop-zone.dragging { transform: translateY(-2px); }
+      .primary-button { transition: transform .2s ease, background-color .2s ease, box-shadow .2s ease; }
+      .primary-button:hover:not(:disabled) { background: #1c574f; box-shadow: 0 10px 20px rgba(34, 105, 96, .17); transform: translateY(-1px); }
+      .coral-button:hover:not(:disabled) { background: #b45c46; }
+      .ghost-button { transition: background-color .2s ease, color .2s ease; }
+      .ghost-button:hover { background: #ebe9df; color: var(--ink); }
+      .issue-card { animation: issue-in .5s both; }
+      .issue-card:nth-child(2) { animation-delay: .08s; }
+      .issue-card:nth-child(3) { animation-delay: .16s; }
+      .issue-card:nth-child(4) { animation-delay: .24s; }
+      @keyframes issue-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      .audit-line { animation: sweep 1.65s cubic-bezier(.4,0,.2,1) infinite; transform-origin: left; }
+      @keyframes sweep { 0% { opacity: 0; transform: scaleX(0); } 18% { opacity: 1; } 70% { opacity: 1; transform: scaleX(1); } 100% { opacity: 0; transform: scaleX(1); } }
+      .pulse-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+      @keyframes pulse-dot { 0%, 100% { opacity: .35; transform: scale(.8); } 50% { opacity: 1; transform: scale(1); } }
+      .fade-up { animation: fade-up .55s both; }
+      @keyframes fade-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+      .score-ring { transform: rotate(-90deg); }
+      .score-ring circle { fill: none; stroke-linecap: round; }
+      /* Night audit theme: dense navy canvas, quiet surfaces, and high-contrast type. */
+      body {
+        background:
+          radial-gradient(circle at 84% 5%, rgba(42, 93, 112, .2), transparent 27rem),
+          radial-gradient(circle at 2% 62%, rgba(38, 83, 82, .16), transparent 29rem),
+          #080d14;
+        color: #edf3f1;
+      }
+      body::before { opacity: .18; }
+      [class~="bg-[#226960]"] { background-color: #1b766f !important; }
+      [class~="bg-[#c96b52]"] { background-color: #c27563 !important; }
+      [class~="bg-[#f6faf6]/70"] { background-color: rgba(16, 29, 37, .72) !important; }
+      [class~="bg-[#e3f0eb]"] { background-color: #123236 !important; }
+      [class~="bg-[#f2f1e8]/75"] { background-color: rgba(16, 25, 34, .84) !important; }
+      [class~="bg-[#fbfbf7]/80"] { background-color: rgba(13, 22, 31, .88) !important; }
+      [class~="bg-[#dfece5]"] { background-color: #153b3a !important; }
+      [class~="bg-[#edf6f1]"] { background-color: #102b30 !important; }
+      [class~="bg-[#d4ebe2]"] { background-color: #17403e !important; }
+      [class~="bg-[#fff1ed]"] { background-color: #321f29 !important; }
+      [class~="bg-[#dbe7e0]"] { background-color: #1d303b !important; }
+      [class~="bg-[#f1f0e8]"] { background-color: #1c2b36 !important; }
+      [class~="bg-[#edf5f0]"] { background-color: #102e32 !important; }
+      [class~="bg-[#fafbf6]"] { background-color: #111c26 !important; }
+      [class~="bg-[#fffefa]"] { background-color: #101923 !important; }
+      [class~="bg-[#e7f2ed]"] { background-color: #123237 !important; }
+      [class~="text-[#f8f6ed]"], [class~="text-[#f7f5ec]"], [class~="text-[#fff8f1]"] { color: #f3f8f5 !important; }
+      [class~="text-[#226960]"] { color: #6bd3c0 !important; }
+      [class~="text-[#c96b52]"] { color: #e18a73 !important; }
+      [class~="text-[#213532]"], [class~="text-[#202e2d]"], [class~="text-[#283d38]"] { color: #eef5f2 !important; }
+      [class~="text-[#334641]"], [class~="text-[#2c403c]"], [class~="text-[#304541]"], [class~="text-[#314640]"] { color: #dfece9 !important; }
+      [class~="text-[#65736f]"], [class~="text-[#87928d]"], [class~="text-[#6d7975]"], [class~="text-[#7a837e]"], [class~="text-[#7c8781]"], [class~="text-[#8b948e]"], [class~="text-[#72807b]"], [class~="text-[#78827d]"], [class~="text-[#7a8580]"] { color: #91a7aa !important; }
+      [class~="text-[#53625d]"], [class~="text-[#596863]"] { color: #b6c8c7 !important; }
+      [class~="text-[#4d6f67]"], [class~="text-[#6c8980]"], [class~="text-[#4d7f74]"] { color: #8dd0c2 !important; }
+      [class~="text-[#44655d]"] { color: #abd8d0 !important; }
+      [class~="text-[#a0a6a0]"], [class~="text-[#8a938e]"] { color: #759095 !important; }
+      [class~="border-[#d8e3dc]"], [class~="border-[#deded4]"], [class~="border-[#dddcd2]"], [class~="border-[#dfded5]"], [class~="border-[#e0ded4]"], [class~="border-[#ece9df]"], [class~="border-[#dbddd3]"], [class~="border-[#d5ddd6]"] { border-color: #263945 !important; }
+      [class~="border-[#bfcfc6]"] { border-color: #31585c !important; }
+      [class~="border-[#c6ded5]"], [class~="border-[#c8ded5]"] { border-color: #2d6661 !important; }
+      [class~="border-[#edc8bf]"] { border-color: #70404a !important; }
+      .soft-shadow { box-shadow: 0 24px 70px rgba(0, 0, 0, .24), 0 1px 2px rgba(0, 0, 0, .3); }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="content-layer mx-auto flex w-full max-w-[1240px] items-center justify-between px-5 py-5 sm:px-8 lg:px-10">
+      <div class="flex items-center gap-3">
+        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#226960] text-[#f8f6ed] shadow-sm" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
+        </div>
+        <div>
+          <div class="text-[15px] font-extrabold tracking-[-.04em] text-[#202e2d]">ClauseShield</div>
+          <div class="mono text-[9px] uppercase tracking-[.16em] text-[#68807a]">Your second set of eyes</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <button id="headerReset" type="button" data-testid="button-header-new-audit" class="ghost-button hidden items-center gap-2 rounded-full px-3 py-2 text-xs font-bold text-[#64736e]">
+          New audit
+        </button>
+        <div class="hidden items-center gap-2 rounded-full border border-[#d8e3dc] bg-[#f6faf6]/70 px-3 py-2 text-[11px] font-bold text-[#4d6f67] sm:flex">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span>Private by design</span>
+        </div>
+      </div>
+    </header>
+
+    <main id="appView" class="content-layer mx-auto w-full max-w-[1240px] px-5 pb-16 pt-9 sm:px-8 sm:pb-24 sm:pt-16 lg:px-10"></main>
+
+    <footer class="content-layer mx-auto flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-4 border-t border-[#dddcd2] px-5 py-6 text-[10px] text-[#8b948e] sm:px-8 lg:px-10">
+      <span class="mono tracking-[.08em]">CLAUSESHIELD / PRIVATE CONTRACT REVIEW</span>
+      <span class="flex items-center gap-2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Not legal advice · Built for clearer conversations</span>
+    </footer>
+
+    <script>
+      (() => {
+        const appView = document.getElementById('appView');
+        const headerReset = document.getElementById('headerReset');
+        let selectedFile = null;
+        let auditResult = null;
+        let errorMessage = '';
+        let isLoading = false;
+        let copiedIndex = -1;
+
+        const icons = {
+          arrow: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>',
+          check: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>',
+          checkCircle: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>',
+          file: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v6h6"/></svg>',
+          x: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+          copy: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>',
+          alert: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 2.9 1.8 17a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 2.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>',
+        };
+
+        const escapeHTML = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
+        }[character]));
+        const formatBytes = (bytes) => bytes < 1024 * 1024
+          ? `${Math.max(1, Math.round(bytes / 1024))} KB`
+          : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+        const severityKey = (value) => {
+          const normalized = String(value || 'medium').toLowerCase();
+          if (normalized.includes('critical')) return 'critical';
+          if (normalized.includes('high')) return 'high';
+          if (normalized.includes('low')) return 'low';
+          return 'medium';
+        };
+        const severityData = {
+          critical: { color: '#ff9c92', bg: '#3a1e2a', border: '#79434d' },
+          high: { color: '#f4b08f', bg: '#3b2820', border: '#81533e' },
+          medium: { color: '#ebd17d', bg: '#3a321d', border: '#76632e' },
+          low: { color: '#7fd3bf', bg: '#123630', border: '#2d7469' },
+        };
+
+        function setHeader(resultVisible) {
+          headerReset.classList.toggle('hidden', !resultVisible);
+          headerReset.classList.toggle('flex', resultVisible);
+        }
+
+        function setError(message) {
+          errorMessage = message;
+          const error = document.getElementById('errorMessage');
+          if (error) {
+            error.innerHTML = `${icons.alert}<span>${escapeHTML(message)}</span><button type="button" data-action="dismiss-error" class="ml-auto rounded p-1 text-[#b76c5d]" aria-label="Dismiss error">${icons.x}</button>`;
+            error.classList.remove('hidden');
+          }
+        }
+
+        function validateAndSelect(file) {
+          if (!file) return;
+          if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+            setError('Please choose a PDF file. ClauseShield reads contracts in PDF format for now.');
+            selectedFile = null;
+            renderHome();
+            return;
+          }
+          if (file.size > 20 * 1024 * 1024) {
+            setError('That PDF is over the 20 MB limit. Try exporting a smaller copy and upload again.');
+            selectedFile = null;
+            renderHome();
+            return;
+          }
+          selectedFile = file;
+          errorMessage = '';
+          renderHome();
+        }
+
+        function uploadMarkup() {
+          return `
+            <div id="dropzone" class="drop-zone relative flex min-h-[285px] flex-col items-center justify-center rounded-[22px] border border-dashed border-[#bfcfc6] bg-[#fbfbf7]/80 px-6 py-10 text-center" data-testid="dropzone-contract">
+              <input id="contractFile" type="file" accept="application/pdf,.pdf" class="hidden" data-testid="input-contract-file" />
+              <div class="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e3f0eb] text-[#226960]">
+                <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+              </div>
+              <div class="text-[15px] font-extrabold text-[#334641]">Drop your PDF here</div>
+              <div class="mt-2 text-[12px] text-[#87928d]">or choose a file from your computer</div>
+              <button type="button" data-action="choose-file" data-testid="button-choose-contract" class="primary-button mt-6 inline-flex items-center gap-2 rounded-full bg-[#226960] px-5 py-3 text-[12px] font-extrabold text-[#f7f5ec]">Choose PDF ${icons.arrow}</button>
+            </div>`;
+        }
+
+        function renderHome() {
+          setHeader(false);
+          appView.innerHTML = `
+            <div class="fade-up">
+              <div class="mb-12 max-w-[720px]">
+                <div class="eyebrow mb-5 flex items-center gap-2"><span class="h-px w-7 bg-[#226960]"></span>Contract risk audit</div>
+                <h1 class="serif max-w-[680px] text-[clamp(2.85rem,7vw,5.6rem)] leading-[.98] tracking-[-.055em] text-[#213532]">Read the fine print<br><em class="text-[#c96b52] not-italic">with your eyes open.</em></h1>
+                <p class="mt-7 max-w-[520px] text-[15px] leading-7 text-[#65736f] sm:text-[17px]">Upload a contract and get a plain-English read on the clauses that could cost you time, money, or control.</p>
+              </div>
+              <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+                ${uploadMarkup()}
+                <aside class="rounded-[22px] border border-[#deded4] bg-[#f2f1e8]/75 p-6 lg:mt-10">
+                  <div class="mb-6 flex h-10 w-10 items-center justify-center rounded-xl bg-[#dfece5] text-[#226960]"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M11 8v6M8 11h6"/></svg></div>
+                  <h2 class="text-[14px] font-extrabold tracking-[-.02em] text-[#2c403c]">What we look for</h2>
+                  <ul class="mt-5 space-y-4">${['Payment and late-fee traps', 'Rights you may be giving away', 'One-sided exit terms'].map((item) => `<li class="flex gap-3 text-[12px] leading-5 text-[#6d7975]">${icons.checkCircle} ${item}</li>`).join('')}</ul>
+                  <div class="mt-7 border-t border-[#dbddd3] pt-5 text-[11px] leading-5 text-[#7a837e]">A useful first pass — not a substitute for advice from a qualified attorney.</div>
+                </aside>
+              </div>
+              ${selectedFile ? `<div class="mx-auto mt-6 max-w-[940px]">
+                <div class="flex items-center justify-between gap-3 rounded-2xl border border-[#c6ded5] bg-[#edf6f1] px-4 py-3.5">
+                  <div class="flex min-w-0 items-center gap-3"><div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#d4ebe2] text-[#226960]">${icons.file}</div><div class="min-w-0 text-left"><div class="truncate text-[13px] font-extrabold text-[#304541]">${escapeHTML(selectedFile.name)}</div><div class="mono mt-1 text-[10px] text-[#6c8980]">${formatBytes(selectedFile.size)} · PDF document</div></div></div>
+                  <button type="button" data-action="remove-file" data-testid="button-remove-contract" class="ghost-button rounded-full p-2 text-[#77938a]" aria-label="Remove selected contract">${icons.x}</button>
+                </div>
+                <div class="mt-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end"><span class="flex items-center justify-center gap-2 text-[11px] text-[#7c8781]">${icons.checkCircle} Ready for a focused first pass</span><button type="button" data-action="analyze" data-testid="button-analyze-contract" class="primary-button coral-button inline-flex items-center justify-center gap-2 rounded-full bg-[#c96b52] px-6 py-3.5 text-[12px] font-extrabold text-[#fff8f1]">Analyze contract ${icons.arrow}</button></div>
+              </div>` : ''}
+              <div class="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3 text-[11px] font-semibold text-[#7c8781]"><span class="flex items-center gap-2">Your file is used for this audit only</span><span class="flex items-center gap-2">PDF files up to 20 MB</span></div>
+              <div id="errorMessage" role="alert" data-testid="status-analyze-error" class="${errorMessage ? '' : 'hidden'} mx-auto mt-6 flex max-w-[940px] items-start gap-3 rounded-2xl border border-[#edc8bf] bg-[#fff1ed] px-4 py-3.5 text-[12px] leading-5 text-[#9a4d3d]">${errorMessage ? `${icons.alert}<span>${escapeHTML(errorMessage)}</span><button type="button" data-action="dismiss-error" class="ml-auto rounded p-1 text-[#b76c5d]" aria-label="Dismiss error">${icons.x}</button>` : ''}</div>
+            </div>`;
+          bindHomeEvents();
+        }
+
+        function bindHomeEvents() {
+          const input = document.getElementById('contractFile');
+          const dropzone = document.getElementById('dropzone');
+          input?.addEventListener('change', (event) => validateAndSelect(event.target.files?.[0]));
+          document.querySelector('[data-action="choose-file"]')?.addEventListener('click', () => input?.click());
+          document.querySelector('[data-action="remove-file"]')?.addEventListener('click', reset);
+          document.querySelector('[data-action="analyze"]')?.addEventListener('click', analyze);
+          document.querySelector('[data-action="dismiss-error"]')?.addEventListener('click', () => { errorMessage = ''; renderHome(); });
+          dropzone?.addEventListener('dragover', (event) => { event.preventDefault(); dropzone.classList.add('dragging'); });
+          dropzone?.addEventListener('dragleave', () => dropzone.classList.remove('dragging'));
+          dropzone?.addEventListener('drop', (event) => { event.preventDefault(); dropzone.classList.remove('dragging'); validateAndSelect(event.dataTransfer.files?.[0]); });
+        }
+
+        function renderLoading() {
+          setHeader(false);
+          appView.innerHTML = `
+            <div class="fade-up mx-auto max-w-[700px] py-14 text-center sm:py-24">
+              <div class="relative mx-auto mb-9 flex h-24 w-24 items-center justify-center rounded-[28px] border border-[#c4ddd4] bg-[#e7f2ed] text-[#226960]">
+                <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg><span class="pulse-dot absolute -right-1 -top-1 h-3 w-3 rounded-full bg-[#c96b52]"></span>
+              </div>
+              <div class="eyebrow">Audit in progress</div><h1 class="serif mt-4 text-4xl tracking-[-.04em] text-[#283d38] sm:text-5xl">Looking between the lines.</h1>
+              <p class="mx-auto mt-4 max-w-[430px] text-sm leading-6 text-[#72807b]">ClauseShield is mapping the important parts of <span class="font-bold text-[#4d6760]">${escapeHTML(selectedFile?.name || 'your contract')}</span> into a clearer picture.</p>
+              <div class="mx-auto mt-10 max-w-[420px] overflow-hidden rounded-full bg-[#dbe7e0]"><div class="audit-line h-1.5 w-full bg-[#c96b52]"></div></div>
+              <div class="mt-4 flex items-center justify-center gap-2 text-[11px] font-semibold text-[#87928d]"><span class="h-1.5 w-1.5 rounded-full bg-[#c96b52]"></span> Checking payment, ownership, exit, and liability clauses</div>
+            </div>`;
+        }
+
+        function riskLabel(score) {
+          if (score >= 75) return 'High exposure';
+          if (score >= 45) return 'Worth a closer look';
+          return 'Lower exposure';
+        }
+
+        function issueMarkup(issue, index) {
+          const severity = severityKey(issue.severity);
+          const style = severityData[severity];
+          const quote = issue.clause_quote || 'A clause in this contract needs a closer look.';
+          const risk = issue.plain_english_risk || 'This wording may create an obligation or risk that is easy to miss on a quick read.';
+          const counter = issue.counter_clause || 'Ask for language that keeps the obligation mutual, specific, and time-bound.';
+          const copyLabel = copiedIndex === index ? 'Copied' : 'Copy';
+          return `<article class="issue-card rounded-[22px] border border-[#e0ded4] bg-[#fffefa] p-5 sm:p-6" data-testid="card-issue-${index}">
+            <div class="flex flex-wrap items-center justify-between gap-3"><div class="flex flex-wrap items-center gap-2"><span class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[.09em]" style="color:${style.color};background:${style.bg};border-color:${style.border}">${icons.alert} ${severity}</span><span class="rounded-full bg-[#f1f0e8] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.08em] text-[#78827d]">${escapeHTML(issue.trap_category || 'Contract term')}</span></div><span class="mono text-[10px] text-[#a0a6a0]">ISSUE ${String(index + 1).padStart(2, '0')}</span></div>
+            <blockquote class="mt-5 border-l-2 border-[#ddad9c] pl-4 text-[14px] italic leading-6 text-[#53625d]">“${escapeHTML(quote)}”</blockquote>
+            <div class="mt-6 grid gap-5 md:grid-cols-2"><div><div class="mono text-[9px] font-medium uppercase tracking-[.13em] text-[#a06a5b]">Why it matters</div><p class="mt-2 text-[13px] leading-6 text-[#596863]">${escapeHTML(risk)}</p></div><div class="rounded-2xl bg-[#edf5f0] p-4"><div class="flex items-center justify-between gap-2"><div class="mono text-[9px] font-medium uppercase tracking-[.13em] text-[#4e8074]">A fairer counter</div><button type="button" data-copy-index="${index}" data-counter="${escapeHTML(counter)}" data-testid="button-copy-counter-${index}" class="ghost-button inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] font-extrabold text-[#4d7f74]">${copiedIndex === index ? icons.check : icons.copy} ${copyLabel}</button></div><p class="mt-2 text-[12px] leading-5 text-[#44655d]">${escapeHTML(counter)}</p></div></div>
+          </article>`;
+        }
+
+        function renderResults() {
+          setHeader(true);
+          const result = auditResult || {};
+          const issues = Array.isArray(result.issues_detected) ? result.issues_detected : [];
+          const score = Math.max(0, Math.min(100, Number.isFinite(Number(result.overall_risk_score)) ? Number(result.overall_risk_score) : 0));
+          const circumference = 2 * Math.PI * 45;
+          appView.innerHTML = `
+            <div class="fade-up">
+              <div class="mb-9 flex flex-wrap items-end justify-between gap-5"><div><div class="eyebrow mb-3 flex items-center gap-2"><span class="h-px w-7 bg-[#226960]"></span>Audit complete</div><h1 class="serif text-[clamp(2.7rem,6vw,4.6rem)] leading-[.98] tracking-[-.055em] text-[#213532]">Here’s what stood out.</h1><div class="mt-4 flex items-center gap-2 text-[12px] text-[#7a8580]">${icons.file} ${escapeHTML(selectedFile?.name || 'Contract')} <span class="text-[#b8bdb7]">·</span> ${selectedFile ? formatBytes(selectedFile.size) : ''}</div></div><button type="button" data-action="reset" data-testid="button-reset-audit" class="ghost-button inline-flex items-center gap-2 rounded-full border border-[#d5ddd6] bg-[#fafbf6] px-4 py-2.5 text-xs font-extrabold text-[#557069]">Re-audit another contract</button></div>
+              <div class="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]"><div class="flex flex-col items-center justify-center rounded-[24px] bg-[#226960] px-6 py-8 text-center text-[#f5f5eb] sm:min-h-[280px]"><div class="relative h-[142px] w-[142px]"><svg viewBox="0 0 110 110" class="score-ring h-full w-full" aria-hidden="true"><circle cx="55" cy="55" r="45" stroke="rgba(239,245,236,.18)" stroke-width="7"></circle><circle cx="55" cy="55" r="45" stroke="#f1b29e" stroke-width="7" stroke-dasharray="${circumference}" stroke-dashoffset="${circumference - (circumference * score) / 100}"></circle></svg><div class="absolute inset-0 flex flex-col items-center justify-center"><span class="serif text-[43px] leading-none">${score}</span><span class="mono mt-1 text-[9px] uppercase tracking-[.14em] text-[#b7d4cb]">risk score</span></div></div><div class="mt-2 text-[15px] font-extrabold">${riskLabel(score)}</div><div class="mt-1 max-w-[210px] text-[11px] leading-5 text-[#c4ddd5]">${issues.length} ${issues.length === 1 ? 'item' : 'items'} surfaced for your attention</div></div>
+                <div class="soft-shadow rounded-[24px] border border-[#e0ded4] bg-[#fffefa] p-6 sm:p-8"><div class="flex items-center gap-2 text-[#226960]"><span class="mono text-[10px] uppercase tracking-[.14em]">Plain-English summary</span></div><p class="serif mt-5 max-w-[740px] text-[23px] leading-[1.35] tracking-[-.02em] text-[#384b46] sm:text-[28px]">${escapeHTML(result.contract_summary || 'Your audit is ready. Review the flagged terms below and consider asking for clearer, more balanced language.')}</p><div class="mt-7 flex items-start gap-3 border-t border-[#ece9df] pt-5 text-[11px] leading-5 text-[#7c8781]">ClauseShield highlights patterns, not legal conclusions. Use these notes to start a better conversation.</div></div></div>
+              <div class="mt-12 flex items-end justify-between gap-4 border-b border-[#dfded5] pb-4"><div><div class="eyebrow">Attention points</div><h2 class="mt-2 text-xl font-extrabold tracking-[-.03em] text-[#314640]">Terms to take to the table</h2></div><span class="mono text-[10px] text-[#8a938e]">${issues.length} FOUND</span></div>
+              ${issues.length ? `<div class="mt-5 space-y-4">${issues.map(issueMarkup).join('')}</div>` : `<div class="mt-5 rounded-[22px] border border-[#c8ded5] bg-[#edf6f1] p-8 text-center"><div class="mx-auto w-fit text-[#317a6e]">${icons.checkCircle}</div><h3 class="mt-4 font-extrabold text-[#31574e]">No obvious traps surfaced</h3><p class="mx-auto mt-2 max-w-[420px] text-sm leading-6 text-[#6a8179]">That’s encouraging. Still, a qualified attorney can spot context-specific concerns that an automated first pass may miss.</p></div>`}
+              <div class="mt-10 flex justify-center"><button type="button" data-action="reset" data-testid="button-bottom-new-audit" class="primary-button inline-flex items-center gap-2 rounded-full bg-[#226960] px-5 py-3 text-xs font-extrabold text-[#f7f5ec]">Audit another contract ${icons.arrow}</button></div>
+            </div>`;
+          document.querySelectorAll('[data-copy-index]').forEach((button) => {
+            button.addEventListener('click', async () => {
+              const text = button.getAttribute('data-counter') || '';
+              try {
+                await navigator.clipboard.writeText(text);
+                copiedIndex = Number(button.getAttribute('data-copy-index'));
+                renderResults();
+                window.setTimeout(() => { copiedIndex = -1; renderResults(); }, 1800);
+              } catch {
+                button.textContent = 'Select to copy';
+              }
+            });
+          });
+          document.querySelectorAll('[data-action="reset"]').forEach((button) => button.addEventListener('click', reset));
+        }
+
+        async function analyze() {
+          if (!selectedFile) return;
+          isLoading = true;
+          errorMessage = '';
+          renderLoading();
+          try {
+            const formData = new FormData();
+            formData.append('contract', selectedFile);
+            const response = await fetch('/api/analyze', { method: 'POST', body: formData });
+            if (!response.ok) {
+              let message = 'We could not complete this audit. Please try again.';
+              try {
+                const body = await response.json();
+                message = body.message || body.error || message;
+              } catch {}
+              throw new Error(message);
+            }
+            auditResult = await response.json();
+            isLoading = false;
+            renderResults();
+          } catch (error) {
+            isLoading = false;
+            renderHome();
+            setError(error instanceof Error ? error.message : 'Something went wrong while auditing your contract.');
+          }
+        }
+
+        function reset() {
+          selectedFile = null;
+          auditResult = null;
+          copiedIndex = -1;
+          errorMessage = '';
+          isLoading = false;
+          setHeader(false);
+          renderHome();
+        }
+
+        headerReset.addEventListener('click', reset);
+        renderHome();
+      })();
+    </script>
+  </body>
+</html>
