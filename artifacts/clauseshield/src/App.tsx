@@ -403,60 +403,84 @@ function Results({ result, file, onReset }: { result: AuditResult; file: File; o
                             Don't leave dangerous contract loopholes unchecked. Get the complete clause breakdown, legal risk translations, and copy-paste counter proposals.
                           </p>
                           <button
-                            type="button"
-                            onClick={() => setIsPaid(true)}
-                            className="w-full bg-[#e07a5f] hover:bg-[#d0694e] text-white font-bold py-3.5 px-6 rounded-xl transition-all duration-200 shadow-lg text-sm sm:text-base cursor-pointer"
-                          >
-                            Unlock Full Audit for ₹199
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-            )
-          )}
+                            onClick={handlePayment}
+              className="w-full bg-[#e07a5f] hover:bg-[#d0684e] text-white font-bold py-3.5 px-6 rounded-xl transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+            >
+              Unlock Full Audit for ₹199
+            </button>
+          </div>
         </div>
-      ) : (
-        <div className="mt-5 rounded-[22px] border border-[#c8ded5] bg-[#edf6f1] p-8 text-center">
-          <CheckCircle2 className="mx-auto text-[#317a6e]" size={30} />
-          <h3 className="mt-4 font-extrabold text-[#31574e]">No obvious traps surfaced</h3>
-          <p className="mx-auto mt-2 max-w-[420px] text-sm leading-6 text-[#6a8179]">That’s encouraging. Still, a qualified attorney can spot context-specific concerns that an automated first pass may miss.</p>
-        </div>
-      )}
-      <div className="mt-10 flex justify-center"><button type="button" onClick={onReset} data-testid="button-bottom-new-audit" className="primary-button inline-flex items-center gap-2 rounded-full bg-[#226960] px-5 py-3 text-xs font-extrabold text-[#f7f5ec]">Audit another contract <ArrowRight size={15} /></button></div>
+      </div>
     </div>
   );
 }
 
 function App() {
   const [file, setFile] = useState<File | null>(null);
-  const [pastedText, setPastedText] = useState('');
+  const [pastedText, setPastedText] = useState("");
   const [result, setResult] = useState<AuditResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [isPaid, setIsPaid] = useState(false);
+
+  const handlePayment = async () => {
+    try {
+      const res = await fetch("/api/create-order", { method: "POST" });
+      const orderData = await res.json();
+
+      if (!res.ok || !orderData.orderId) {
+        alert("Unable to initiate payment. Please check server logs.");
+        return;
+      }
+
+      const options = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "ClauseShield",
+        description: "Unlock Full Contract Audit",
+        order_id: orderData.orderId,
+        handler: async function (response: any) {
+          const verifyRes = await fetch("/api/verify-payment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+          });
+
+          const verifyData = await verifyRes.json();
+          if (verifyData.verified) {
+            setIsPaid(true);
+          } else {
+            alert("Payment verification failed. Please contact support.");
+          }
+        },
+        theme: {
+          color: "#0f172a",
+        },
+      };
+
+      const paymentObject = new (window as any).Razorpay(options);
+      paymentObject.open();
+    } catch (err) {
+      console.error(err);
+      alert("Payment failed to initialize.");
+    }
+  };
 
   const selectFile = () => {
     const input = document.querySelector<HTMLInputElement>('[data-testid="input-contract-file"]');
     if (input) {
       const fileFromInput = input.files?.[0];
       if (fileFromInput) {
-        setError('');
+        setError("");
         setFile(fileFromInput);
       }
     }
   };
-
-  const reset = () => {
-    setFile(null);
-    setPastedText('');
-    setResult(null);
-    setError('');
-  setIsPaid(false);
-    const input = document.querySelector<HTMLInputElement>('[data-testid="input-contract-file"]');
-    if (input) input.value = '';
-  };
-
   const analyze = async () => {
     if (!file && !pastedText.trim()) {
       setError('Please choose a PDF file or paste contract text.');
