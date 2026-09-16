@@ -495,7 +495,42 @@
                 <div class="soft-shadow rounded-[24px] border border-[#e0ded4] bg-[#fffefa] p-6 sm:p-8"><div class="flex items-center gap-2 text-[#226960]"><span class="mono text-[10px] uppercase tracking-[.14em]">Plain-English summary</span></div><p class="serif mt-5 max-w-[740px] text-[23px] leading-[1.35] tracking-[-.02em] text-[#384b46] sm:text-[28px]">${escapeHTML(result.contract_summary || 'Your audit is ready. Review the flagged terms below and consider asking for clearer, more balanced language.')}</p><div class="mt-7 flex items-start gap-3 border-t border-[#ece9df] pt-5 text-[11px] leading-5 text-[#7c8781]">ClauseShield highlights patterns, not legal conclusions. Use these notes to start a better conversation.</div></div></div>
                 <details open class="mt-8 overflow-hidden rounded-[24px] border border-[#d5ddd6] bg-[#f2f5ee]" data-testid="card-negotiation-email"><summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 sm:px-6"><span><span class="eyebrow">Negotiation mode</span><span class="mt-1 block text-[17px] font-extrabold tracking-[-.02em] text-[#213532]" style="color:#213532">Client Negotiation Email</span></span><button type="button" data-action="copy-email" data-testid="button-copy-full-email" class="primary-button inline-flex shrink-0 items-center gap-2 rounded-full bg-[#226960] px-4 py-2.5 text-[11px] font-extrabold text-[#f7f5ec]">${emailCopied ? icons.check : icons.copy} ${emailCopied ? 'Copied!' : 'Copy Full Email'}</button></summary><div class="border-t border-[#d5ddd6] px-5 pb-6 pt-5 sm:px-6"><p class="mb-4 text-[12px] leading-5 text-[#6f7c76]">A diplomatic draft that brings the flagged sections and suggested language into one client-ready message.</p><pre class="whitespace-pre-wrap rounded-2xl border border-[#dfe5dc] bg-[#fbfcf8] p-5 font-sans text-[13px] leading-6 text-[#42534d]">${escapeHTML(negotiationEmail)}</pre></div></details>
               <div class="mt-12 flex items-end justify-between gap-4 border-b border-[#dfded5] pb-4"><div><div class="eyebrow">Attention points</div><h2 class="mt-2 text-xl font-extrabold tracking-[-.03em] text-[#314640]">Terms to take to the table</h2></div><span class="mono text-[10px] text-[#8a938e]">${issues.length} FOUND</span></div>
-              ${issues.length ? `<div class="mt-5 space-y-4">${issues.map(issueMarkup).join('')}</div>` : `<div class="mt-5 rounded-[22px] border border-[#c8ded5] bg-[#edf6f1] p-8 text-center"><div class="mx-auto w-fit text-[#317a6e]">${icons.checkCircle}</div><h3 class="mt-4 font-extrabold text-[#31574e]">No obvious traps surfaced</h3><p class="mx-auto mt-2 max-w-[420px] text-sm leading-6 text-[#6a8179]">That’s encouraging. Still, a qualified attorney can spot context-specific concerns that an automated first pass may miss.</p></div>`}
+              ${issues.length ? `
+                <div class="mt-5 space-y-4">
+                  <!-- First Issue Free -->
+                  ${issueMarkup(issues[0], 0)}
+
+                  <!-- Remaining Issues Blurred with Paywall Card -->
+                  ${issues.length > 1 ? `
+                    <div class="relative mt-6">
+                      <div id="locked-issues-container" class="space-y-4 filter blur-md select-none pointer-events-none opacity-40">
+                        ${issues.slice(1).map((issue, idx) => issueMarkup(issue, idx + 1)).join('')}
+                      </div>
+
+                      <div id="paywall-card" class="absolute inset-0 flex items-center justify-center p-4 z-20">
+                        <div class="bg-[#19231f] text-white p-6 sm:p-8 rounded-[20px] shadow-2xl text-center max-w-[460px] border border-[#2d3e38]">
+                          <div class="inline-block bg-[#0f766e] text-white text-xs font-semibold px-3 py-1 rounded-full mb-3 uppercase tracking-wider">
+                            Premium Analysis
+                          </div>
+                          <h3 class="text-xl sm:text-2xl font-black mb-2 text-white">
+                            Unlock All ${issues.length} Red Flags & Counter-Clauses
+                          </h3>
+                          <p class="text-xs sm:text-sm text-gray-300 mb-6 leading-relaxed">
+                            Don't leave dangerous contract loopholes unchecked. Get the complete clause breakdown, legal risk translations, and copy-paste counter proposals.
+                          </p>
+                          <button
+                            type="button"
+                            onclick="document.getElementById('locked-issues-container').classList.remove('blur-md', 'select-none', 'pointer-events-none', 'opacity-40'); document.getElementById('paywall-card').remove();"
+                            class="w-full bg-[#e07a5f] hover:bg-[#d0694e] text-white font-bold py-3.5 px-6 rounded-xl transition-all duration-200 shadow-lg text-sm sm:text-base cursor-pointer"
+                          >
+                            Unlock Full Audit for ₹199
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ` : ''}
+                </div>
+              ` : `<div class="mt-5 rounded-[22px] border border-[#c8ded5] bg-[#edf6f1] p-8 text-center"><div class="mx-auto w-fit text-[#317a6e]">${icons.checkCircle}</div><h3 class="mt-4 font-extrabold text-[#31574e]">No obvious traps surfaced</h3><p class="mx-auto mt-2 max-w-[420px] text-sm leading-6 text-[#6a8179]">That’s encouraging. Still, a qualified attorney can spot context-specific concerns that an automated first pass may miss.</p></div>`}
               <div class="mt-10 flex justify-center"><button type="button" data-action="reset" data-testid="button-bottom-new-audit" class="primary-button inline-flex items-center gap-2 rounded-full bg-[#226960] px-5 py-3 text-xs font-extrabold text-[#f7f5ec]">Audit another contract ${icons.arrow}</button></div>
             </div>`;
           document.querySelectorAll('[data-copy-index]').forEach((button) => {

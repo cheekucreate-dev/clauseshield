@@ -297,6 +297,7 @@ function IssueCard({ issue, index, onCopy, copied }: { issue: Issue; index: numb
 
 function Results({ result, file, onReset }: { result: AuditResult; file: File; onReset: () => void }) {
   const [copied, setCopied] = useState<number | null>(null);
+  const [isPaid, setIsPaid] = useState(false);
   const issues = Array.isArray(result.issues_detected) ? result.issues_detected : [];
   const score = Number.isFinite(Number(result.overall_risk_score)) ? Number(result.overall_risk_score) : 0;
   const copyCounter = (text: string, index: number) => {
@@ -343,7 +344,77 @@ function Results({ result, file, onReset }: { result: AuditResult; file: File; o
 
       {issues.length > 0 ? (
         <div className="mt-5 space-y-4">
-          {issues.map((issue, index) => <IssueCard key={`${issue.trap_category}-${index}`} issue={issue} index={index} onCopy={copyCounter} copied={copied === index} />)}
+          {/* Pehla Issue (Sabhi ke liye Free) */}
+          {issues.slice(0, 1).map((issue, index) => (
+            <IssueCard
+              key={`${issue.trap_category}-${index}`}
+              issue={issue}
+              index={index}
+              onCopy={copyCounter}
+              copied={copied === index}
+            />
+          ))}
+
+          {/* Baaki ke Issues: Agar isPaid true hai toh normal, warna Blurred + Paywall */}
+          {issues.length > 1 && (
+            isPaid ? (
+              issues.slice(1).map((issue, index) => (
+                <IssueCard
+                  key={`${issue.trap_category}-${index + 1}`}
+                  issue={issue}
+                  index={index + 1}
+                  onCopy={copyCounter}
+                  copied={copied === index + 1}
+                />
+              ))
+            ) : (
+              <div className="relative mt-6 rounded-[22px] overflow-hidden border border-[#d8dad0] bg-[#fbfbf7]/50 p-2">
+                {/* Blurred Background Teaser */}
+                <div className="filter blur-md select-none pointer-events-none opacity-40 space-y-4">
+                  <div className="relative mt-6">
+                    <div
+                      className={
+                        !isPaid
+                          ? "filter blur-md select-none pointer-events-none opacity-40 space-y-4"
+                          : "space-y-4"
+                      }
+                    >
+                      {issues.slice(1).map((issue, index) => (
+                        <IssueCard
+                          key={`locked-${index}`}
+                          issue={issue}
+                          index={index + 1}
+                          onCopy={() => {}}
+                          copied={false}
+                        />
+                      ))}
+                    </div>
+
+                    {!isPaid && (
+                      <div className="absolute inset-0 flex items-center justify-center p-4 z-20">
+                        <div className="bg-[#19231f] text-white p-6 sm:p-8 rounded-[20px] shadow-2xl text-center max-w-[460px] border border-[#2d3e38]">
+                          <div className="inline-block bg-[#0f766e] text-white text-xs font-semibold px-3 py-1 rounded-full mb-3 uppercase tracking-wider">
+                            Premium Analysis
+                          </div>
+                          <h3 className="text-xl sm:text-2xl font-black mb-2">
+                            Unlock All {issues.length} Red Flags & Counter-Clauses
+                          </h3>
+                          <p className="text-xs sm:text-sm text-gray-300 mb-6 leading-relaxed">
+                            Don't leave dangerous contract loopholes unchecked. Get the complete clause breakdown, legal risk translations, and copy-paste counter proposals.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setIsPaid(true)}
+                            className="w-full bg-[#e07a5f] hover:bg-[#d0694e] text-white font-bold py-3.5 px-6 rounded-xl transition-all duration-200 shadow-lg text-sm sm:text-base cursor-pointer"
+                          >
+                            Unlock Full Audit for ₹199
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+            )
+          )}
         </div>
       ) : (
         <div className="mt-5 rounded-[22px] border border-[#c8ded5] bg-[#edf6f1] p-8 text-center">
@@ -363,6 +434,7 @@ function App() {
   const [result, setResult] = useState<AuditResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isPaid, setIsPaid] = useState(false);
 
   const selectFile = () => {
     const input = document.querySelector<HTMLInputElement>('[data-testid="input-contract-file"]');
@@ -380,6 +452,7 @@ function App() {
     setPastedText('');
     setResult(null);
     setError('');
+  setIsPaid(false);
     const input = document.querySelector<HTMLInputElement>('[data-testid="input-contract-file"]');
     if (input) input.value = '';
   };
