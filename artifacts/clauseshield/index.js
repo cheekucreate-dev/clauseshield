@@ -8,8 +8,8 @@ import Razorpay from "razorpay";
 import crypto from "crypto";
 
 const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || "rzp_test_placeholder",
-  key_secret: process.env.RAZORPAY_KEY_SECRET || "placeholder_secret",
+  key_id: "rzp_test_TclMBt0hwg68DC",
+  key_secret: "TaR5BTzmCpDPFRK3Qq1afhV5",
 });
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
