@@ -517,15 +517,13 @@
                           </h3>
                           <p class="text-xs sm:text-sm text-gray-300 mb-6 leading-relaxed">
                             Don't leave dangerous contract loopholes unchecked. Get the complete clause breakdown, legal risk translations, and copy-paste counter proposals.
-                          </p>
                           <button
-                            type="button"
-                            onclick="document.getElementById('locked-issues-container').classList.remove('blur-md', 'select-none', 'pointer-events-none', 'opacity-40'); document.getElementById('paywall-card').remove();"
-                            class="w-full bg-[#e07a5f] hover:bg-[#d0694e] text-white font-bold py-3.5 px-6 rounded-xl transition-all duration-200 shadow-lg text-sm sm:text-base cursor-pointer"
-                          >
-                            Unlock Full Audit for ₹199
-                          </button>
-                        </div>
+                          type="button"
+                          onclick="triggerRazorpayPayment()"
+                          class="w-full bg-[#e07a5f] hover:bg-[#d0684e] text-white font-bold py-3.5 px-6 rounded-xl transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+                        >
+                          Unlock Full Audit for ₹199
+                        </button>
                       </div>
                     </div>
                   ` : ''}
