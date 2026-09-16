@@ -77,8 +77,6 @@ function validateAuditResult(result) {
     result.issues_detected = [];
   }
 
-  return result;
-}
 
   // Safe issue sanitization (no crashes, accepts whatever Groq provides)
   result.issues_detected = (result.issues_detected || []).map((issue) => ({
