@@ -169,7 +169,8 @@
         let isLoading = false;
         let copiedIndex = -1;
         let inputMode = 'pdf';
-        let contractText = '';
+         let contractText = '';
+         let auditTimestamp = null;
 
         const icons = {
           arrow: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>',
@@ -177,7 +178,8 @@
           checkCircle: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>',
           file: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v6h6"/></svg>',
           x: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>',
-          copy: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>',
+           copy: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>',
+           download: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>',
           alert: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 2.9 1.8 17a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 2.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>',
         };
 
@@ -200,6 +202,82 @@
           medium: { color: '#ebd17d', bg: '#3a321d', border: '#76632e' },
           low: { color: '#7fd3bf', bg: '#123630', border: '#2d7469' },
         };
+         const reportText = (value) => String(value ?? '').trim();
+         const reportQuote = (value) => reportText(value).split('\n').map((line) => `> ${line || ' '}`).join('\n');
+         const reportFilePart = (value) => reportText(value).toLowerCase().replace(/\.[a-z0-9]+$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'contract';
+
+         function downloadReport() {
+           if (!auditResult) return;
+           const result = auditResult;
+           const issues = Array.isArray(result.issues_detected) ? result.issues_detected : [];
+           const score = Math.max(0, Math.min(100, Number.isFinite(Number(result.overall_risk_score)) ? Number(result.overall_risk_score) : 0));
+           const contractName = selectedFile?.name || (inputMode === 'text' ? 'Pasted contract text' : 'Contract');
+           const generatedAt = auditTimestamp ? new Date(auditTimestamp) : new Date();
+           const timestamp = generatedAt.toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' });
+           const lines = [
+             '# ClauseShield Audit Report',
+             '',
+             `**Contract:** ${reportText(contractName)}`,
+             `**Generated:** ${timestamp}`,
+             '',
+             '## Risk Overview',
+             '',
+             `- **Overall risk score:** ${score} / 100`,
+             `- **Exposure level:** ${riskLabel(score)}`,
+             `- **Flagged issues:** ${issues.length}`,
+             '',
+             '## Executive Summary',
+             '',
+             reportText(result.contract_summary) || 'No executive summary was returned.',
+             '',
+             '## Detailed Findings',
+             '',
+           ];
+           if (!issues.length) {
+             lines.push('No flagged issues were detected in the five ClauseShield review categories.');
+           } else {
+             issues.forEach((issue, index) => {
+               const counter = issue.counter_proposal || issue.counter_clause || 'No counter-clause was returned.';
+               lines.push(
+                 `### ${String(index + 1).padStart(2, '0')} — ${reportText(issue.trap_category) || 'Contract issue'}`,
+                 '',
+                 `**Severity:** ${reportText(issue.severity) || 'Not specified'}`,
+                 '',
+                 '**Original clause**',
+                 '',
+                 reportQuote(issue.clause_quote || 'No exact clause quote was returned.'),
+                 '',
+                 '**Risk reasoning**',
+                 '',
+                 reportText(issue.plain_english_risk) || 'No risk reasoning was returned.',
+                 '',
+                 '**Suggested counter-clause**',
+                 '',
+                 reportQuote(counter),
+                 '',
+                 '**Negotiation tip**',
+                 '',
+                 reportText(issue.negotiation_tip) || 'Frame the change as a way to make the agreement clearer and fairer for both sides.',
+                 '',
+               );
+             });
+           }
+           lines.push(
+             '---',
+             '',
+             '_ClauseShield provides an automated first pass for discussion and is not legal advice._',
+             '',
+           );
+           const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
+           const url = URL.createObjectURL(blob);
+           const link = document.createElement('a');
+           link.href = url;
+           link.download = `clauseshield-audit-${reportFilePart(contractName)}.md`;
+           document.body.appendChild(link);
+           link.click();
+           link.remove();
+           window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+         }
 
         function setHeader(resultVisible) {
           headerReset.classList.toggle('hidden', !resultVisible);
@@ -363,10 +441,12 @@
           const issues = Array.isArray(result.issues_detected) ? result.issues_detected : [];
           const score = Math.max(0, Math.min(100, Number.isFinite(Number(result.overall_risk_score)) ? Number(result.overall_risk_score) : 0));
           const circumference = 2 * Math.PI * 45;
+           const contractName = selectedFile?.name || (inputMode === 'text' ? 'Pasted contract text' : 'Contract');
+           const contractMeta = selectedFile ? formatBytes(selectedFile.size) : (inputMode === 'text' ? 'Pasted text' : '');
           appView.innerHTML = `
             <div class="fade-up">
-              <div class="mb-9 flex flex-wrap items-end justify-between gap-5"><div><div class="eyebrow mb-3 flex items-center gap-2"><span class="h-px w-7 bg-[#226960]"></span>Audit complete</div><h1 class="serif text-[clamp(2.7rem,6vw,4.6rem)] leading-[.98] tracking-[-.055em] text-[#213532]">Here’s what stood out.</h1><div class="mt-4 flex items-center gap-2 text-[12px] text-[#7a8580]">${icons.file} ${escapeHTML(selectedFile?.name || 'Contract')} <span class="text-[#b8bdb7]">·</span> ${selectedFile ? formatBytes(selectedFile.size) : ''}</div></div><button type="button" data-action="reset" data-testid="button-reset-audit" class="ghost-button inline-flex items-center gap-2 rounded-full border border-[#d5ddd6] bg-[#fafbf6] px-4 py-2.5 text-xs font-extrabold text-[#557069]">Re-audit another contract</button></div>
-              <div class="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]"><div class="flex flex-col items-center justify-center rounded-[24px] bg-[#226960] px-6 py-8 text-center text-[#f5f5eb] sm:min-h-[280px]"><div class="relative h-[142px] w-[142px]"><svg viewBox="0 0 110 110" class="score-ring h-full w-full" aria-hidden="true"><circle cx="55" cy="55" r="45" stroke="rgba(239,245,236,.18)" stroke-width="7"></circle><circle cx="55" cy="55" r="45" stroke="#f1b29e" stroke-width="7" stroke-dasharray="${circumference}" stroke-dashoffset="${circumference - (circumference * score) / 100}"></circle></svg><div class="absolute inset-0 flex flex-col items-center justify-center"><span class="serif text-[43px] leading-none">${score}</span><span class="mono mt-1 text-[9px] uppercase tracking-[.14em] text-[#b7d4cb]">risk score</span></div></div><div class="mt-2 text-[15px] font-extrabold">${riskLabel(score)}</div><div class="mt-1 max-w-[210px] text-[11px] leading-5 text-[#c4ddd5]">${issues.length} ${issues.length === 1 ? 'item' : 'items'} surfaced for your attention</div></div>
+              <div class="mb-9 flex flex-wrap items-end justify-between gap-5"><div><div class="eyebrow mb-3 flex items-center gap-2"><span class="h-px w-7 bg-[#226960]"></span>Audit complete</div><h1 class="serif text-[clamp(2.7rem,6vw,4.6rem)] leading-[.98] tracking-[-.055em] text-[#213532]">Here’s what stood out.</h1><div class="mt-4 flex items-center gap-2 text-[12px] text-[#7a8580]">${icons.file} ${escapeHTML(contractName)} <span class="text-[#b8bdb7]">·</span> ${escapeHTML(contractMeta)}</div></div><button type="button" data-action="reset" data-testid="button-reset-audit" class="ghost-button inline-flex items-center gap-2 rounded-full border border-[#d5ddd6] bg-[#fafbf6] px-4 py-2.5 text-xs font-extrabold text-[#557069]">Re-audit another contract</button></div>
+              <div class="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]"><div class="flex flex-col items-center justify-center rounded-[24px] bg-[#226960] px-6 py-8 text-center text-[#f5f5eb] sm:min-h-[280px]"><div class="relative h-[142px] w-[142px]"><svg viewBox="0 0 110 110" class="score-ring h-full w-full" aria-hidden="true"><circle cx="55" cy="55" r="45" stroke="rgba(239,245,236,.18)" stroke-width="7"></circle><circle cx="55" cy="55" r="45" stroke="#f1b29e" stroke-width="7" stroke-dasharray="${circumference}" stroke-dashoffset="${circumference - (circumference * score) / 100}"></circle></svg><div class="absolute inset-0 flex flex-col items-center justify-center"><span class="serif text-[43px] leading-none">${score}</span><span class="mono mt-1 text-[9px] uppercase tracking-[.14em] text-[#b7d4cb]">risk score</span></div></div><div class="mt-2 text-[15px] font-extrabold">${riskLabel(score)}</div><div class="mt-1 max-w-[210px] text-[11px] leading-5 text-[#c4ddd5]">${issues.length} ${issues.length === 1 ? 'item' : 'items'} surfaced for your attention</div><button type="button" data-action="download-report" data-testid="button-download-report" class="primary-button mt-6 inline-flex items-center gap-2 rounded-full bg-[#f1b29e] px-4 py-2.5 text-[11px] font-extrabold text-[#213532]">${icons.download} Download Report</button></div>
                 <div class="soft-shadow rounded-[24px] border border-[#e0ded4] bg-[#fffefa] p-6 sm:p-8"><div class="flex items-center gap-2 text-[#226960]"><span class="mono text-[10px] uppercase tracking-[.14em]">Plain-English summary</span></div><p class="serif mt-5 max-w-[740px] text-[23px] leading-[1.35] tracking-[-.02em] text-[#384b46] sm:text-[28px]">${escapeHTML(result.contract_summary || 'Your audit is ready. Review the flagged terms below and consider asking for clearer, more balanced language.')}</p><div class="mt-7 flex items-start gap-3 border-t border-[#ece9df] pt-5 text-[11px] leading-5 text-[#7c8781]">ClauseShield highlights patterns, not legal conclusions. Use these notes to start a better conversation.</div></div></div>
               <div class="mt-12 flex items-end justify-between gap-4 border-b border-[#dfded5] pb-4"><div><div class="eyebrow">Attention points</div><h2 class="mt-2 text-xl font-extrabold tracking-[-.03em] text-[#314640]">Terms to take to the table</h2></div><span class="mono text-[10px] text-[#8a938e]">${issues.length} FOUND</span></div>
               ${issues.length ? `<div class="mt-5 space-y-4">${issues.map(issueMarkup).join('')}</div>` : `<div class="mt-5 rounded-[22px] border border-[#c8ded5] bg-[#edf6f1] p-8 text-center"><div class="mx-auto w-fit text-[#317a6e]">${icons.checkCircle}</div><h3 class="mt-4 font-extrabold text-[#31574e]">No obvious traps surfaced</h3><p class="mx-auto mt-2 max-w-[420px] text-sm leading-6 text-[#6a8179]">That’s encouraging. Still, a qualified attorney can spot context-specific concerns that an automated first pass may miss.</p></div>`}
@@ -386,6 +466,7 @@
             });
           });
           document.querySelectorAll('[data-action="reset"]').forEach((button) => button.addEventListener('click', reset));
+           document.querySelector('[data-action="download-report"]')?.addEventListener('click', downloadReport);
         }
 
         async function analyze() {
@@ -413,6 +494,7 @@
               throw new Error(message);
             }
             auditResult = await response.json();
+             auditTimestamp = new Date().toISOString();
             isLoading = false;
             renderResults();
           } catch (error) {
@@ -427,6 +509,7 @@
           contractText = '';
           inputMode = 'pdf';
           auditResult = null;
+           auditTimestamp = null;
           copiedIndex = -1;
           errorMessage = '';
           isLoading = false;
