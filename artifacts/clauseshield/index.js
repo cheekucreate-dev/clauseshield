@@ -28,6 +28,8 @@ const auditSchema = {
       clause_quote: "A short exact quote from the contract, or an empty string if the category is not present.",
       plain_english_risk: "A clear explanation of the business risk in plain English.",
       counter_clause: "A specific, negotiation-ready replacement clause.",
+      counter_proposal: "A balanced, fair, and legally protective rewrite that protects the user without alienating the counterparty.",
+      negotiation_tip: "A concise, polite 1-2 sentence explanation for justifying this change in an email or negotiation.",
     },
   ],
 };
@@ -86,7 +88,9 @@ function validateAuditResult(result) {
       !allowedSeverities.has(issue.severity) ||
       typeof issue.clause_quote !== "string" ||
       typeof issue.plain_english_risk !== "string" ||
-      typeof issue.counter_clause !== "string"
+      typeof issue.counter_clause !== "string" ||
+      typeof issue.counter_proposal !== "string" ||
+      typeof issue.negotiation_tip !== "string"
     ) {
       throw new Error("The AI returned an invalid issue structure.");
     }
@@ -141,7 +145,7 @@ app.post("/api/analyze", upload.single("contract"), async (req, res) => {
         {
           role: "system",
           content:
-            "You are ClauseShield, a contract risk auditor for freelancers and small businesses. Return only valid JSON that exactly matches the requested schema. Audit only for the five specified trap categories. Do not invent clauses. If a category is absent, do not include an issue for it. Quote exact contract language when possible. Counter-clauses must be practical replacement language, not general advice.",
+            "You are ClauseShield, a contract risk auditor for freelancers and small businesses. Return only valid JSON that exactly matches the requested schema. Audit only for the five specified trap categories. Do not invent clauses. If a category is absent, do not include an issue for it. Quote exact contract language when possible. Counter-clauses and counter-proposals must be practical replacement language, not general advice. Make each counter_proposal balanced, fair, and legally protective without sounding hostile to the counterparty. Make each negotiation_tip polite, concise, and 1-2 sentences long so the user can adapt it for an email or live negotiation.",
         },
         {
           role: "user",
