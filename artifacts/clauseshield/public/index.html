@@ -168,6 +168,7 @@
         let errorMessage = '';
         let isLoading = false;
         let copiedIndex = -1;
+         let emailCopied = false;
         let inputMode = 'pdf';
          let contractText = '';
          let auditTimestamp = null;
@@ -277,6 +278,41 @@
            link.click();
            link.remove();
            window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+         }
+
+         function buildNegotiationEmail(result, contractName, issues) {
+           const title = reportText(contractName).replace(/\.[a-z0-9]+$/i, '') || 'the agreement';
+           const issueLines = issues.length
+             ? issues.map((issue, index) => {
+                 const counter = issue.counter_proposal || issue.counter_clause || 'Language that keeps the obligation specific, mutual, and proportionate.';
+                 const tip = issue.negotiation_tip || 'This change should make the agreement clearer and fairer for both sides.';
+                 const risk = issue.plain_english_risk || 'This section may create an obligation that is broader than intended.';
+                 return [
+                   `${index + 1}. ${issue.trap_category || 'Flagged section'} (${issue.severity || 'Review'})`,
+                   `   Why I’m raising it: ${risk}`,
+                   `   Suggested language: “${counter}”`,
+                   `   A helpful way to frame it: ${tip}`,
+                 ].join('\n');
+               }).join('\n\n')
+             : 'No specific sections were flagged in this first-pass review.';
+           return [
+             `Subject: Proposed clarifications to ${title}`,
+             '',
+             'Hello,',
+             '',
+             'Thank you for sharing the agreement and for the opportunity to work together. I reviewed the terms and have a few targeted suggestions that would help us keep the arrangement clear, balanced, and easy to administer for everyone.',
+             '',
+             'Here are the sections I would appreciate discussing:',
+             '',
+             issueLines,
+             '',
+             'These edits are intended to clarify expectations and allocate responsibility fairly, while preserving the goals of the agreement. I’m happy to discuss any of the wording and work toward language that is practical for both sides.',
+             '',
+             'I’m looking forward to finalizing the terms smoothly and getting started.',
+             '',
+             'Best,',
+             '[Your Name]',
+           ].join('\n');
          }
 
         function setHeader(resultVisible) {
@@ -443,11 +479,13 @@
           const circumference = 2 * Math.PI * 45;
            const contractName = selectedFile?.name || (inputMode === 'text' ? 'Pasted contract text' : 'Contract');
            const contractMeta = selectedFile ? formatBytes(selectedFile.size) : (inputMode === 'text' ? 'Pasted text' : '');
+           const negotiationEmail = buildNegotiationEmail(result, contractName, issues);
           appView.innerHTML = `
             <div class="fade-up">
               <div class="mb-9 flex flex-wrap items-end justify-between gap-5"><div><div class="eyebrow mb-3 flex items-center gap-2"><span class="h-px w-7 bg-[#226960]"></span>Audit complete</div><h1 class="serif text-[clamp(2.7rem,6vw,4.6rem)] leading-[.98] tracking-[-.055em] text-[#213532]">Here’s what stood out.</h1><div class="mt-4 flex items-center gap-2 text-[12px] text-[#7a8580]">${icons.file} ${escapeHTML(contractName)} <span class="text-[#b8bdb7]">·</span> ${escapeHTML(contractMeta)}</div></div><button type="button" data-action="reset" data-testid="button-reset-audit" class="ghost-button inline-flex items-center gap-2 rounded-full border border-[#d5ddd6] bg-[#fafbf6] px-4 py-2.5 text-xs font-extrabold text-[#557069]">Re-audit another contract</button></div>
               <div class="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]"><div class="flex flex-col items-center justify-center rounded-[24px] bg-[#226960] px-6 py-8 text-center text-[#f5f5eb] sm:min-h-[280px]"><div class="relative h-[142px] w-[142px]"><svg viewBox="0 0 110 110" class="score-ring h-full w-full" aria-hidden="true"><circle cx="55" cy="55" r="45" stroke="rgba(239,245,236,.18)" stroke-width="7"></circle><circle cx="55" cy="55" r="45" stroke="#f1b29e" stroke-width="7" stroke-dasharray="${circumference}" stroke-dashoffset="${circumference - (circumference * score) / 100}"></circle></svg><div class="absolute inset-0 flex flex-col items-center justify-center"><span class="serif text-[43px] leading-none">${score}</span><span class="mono mt-1 text-[9px] uppercase tracking-[.14em] text-[#b7d4cb]">risk score</span></div></div><div class="mt-2 text-[15px] font-extrabold">${riskLabel(score)}</div><div class="mt-1 max-w-[210px] text-[11px] leading-5 text-[#c4ddd5]">${issues.length} ${issues.length === 1 ? 'item' : 'items'} surfaced for your attention</div><button type="button" data-action="download-report" data-testid="button-download-report" class="primary-button mt-6 inline-flex items-center gap-2 rounded-full bg-[#f1b29e] px-4 py-2.5 text-[11px] font-extrabold text-[#213532]">${icons.download} Download Report</button></div>
                 <div class="soft-shadow rounded-[24px] border border-[#e0ded4] bg-[#fffefa] p-6 sm:p-8"><div class="flex items-center gap-2 text-[#226960]"><span class="mono text-[10px] uppercase tracking-[.14em]">Plain-English summary</span></div><p class="serif mt-5 max-w-[740px] text-[23px] leading-[1.35] tracking-[-.02em] text-[#384b46] sm:text-[28px]">${escapeHTML(result.contract_summary || 'Your audit is ready. Review the flagged terms below and consider asking for clearer, more balanced language.')}</p><div class="mt-7 flex items-start gap-3 border-t border-[#ece9df] pt-5 text-[11px] leading-5 text-[#7c8781]">ClauseShield highlights patterns, not legal conclusions. Use these notes to start a better conversation.</div></div></div>
+               <details open class="mt-8 overflow-hidden rounded-[24px] border border-[#d5ddd6] bg-[#f2f5ee]" data-testid="card-negotiation-email"><summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 sm:px-6"><span><span class="eyebrow">Negotiation mode</span><span class="mt-1 block text-[17px] font-extrabold tracking-[-.02em] text-[#314640]">Client Negotiation Email</span></span><button type="button" data-action="copy-email" data-testid="button-copy-full-email" class="primary-button inline-flex shrink-0 items-center gap-2 rounded-full bg-[#226960] px-4 py-2.5 text-[11px] font-extrabold text-[#f7f5ec]">${emailCopied ? icons.check : icons.copy} ${emailCopied ? 'Copied!' : 'Copy Full Email'}</button></summary><div class="border-t border-[#d5ddd6] px-5 pb-6 pt-5 sm:px-6"><p class="mb-4 text-[12px] leading-5 text-[#6f7c76]">A diplomatic draft that brings the flagged sections and suggested language into one client-ready message.</p><pre class="whitespace-pre-wrap rounded-2xl border border-[#dfe5dc] bg-[#fbfcf8] p-5 font-sans text-[13px] leading-6 text-[#42534d]">${escapeHTML(negotiationEmail)}</pre></div></details>
               <div class="mt-12 flex items-end justify-between gap-4 border-b border-[#dfded5] pb-4"><div><div class="eyebrow">Attention points</div><h2 class="mt-2 text-xl font-extrabold tracking-[-.03em] text-[#314640]">Terms to take to the table</h2></div><span class="mono text-[10px] text-[#8a938e]">${issues.length} FOUND</span></div>
               ${issues.length ? `<div class="mt-5 space-y-4">${issues.map(issueMarkup).join('')}</div>` : `<div class="mt-5 rounded-[22px] border border-[#c8ded5] bg-[#edf6f1] p-8 text-center"><div class="mx-auto w-fit text-[#317a6e]">${icons.checkCircle}</div><h3 class="mt-4 font-extrabold text-[#31574e]">No obvious traps surfaced</h3><p class="mx-auto mt-2 max-w-[420px] text-sm leading-6 text-[#6a8179]">That’s encouraging. Still, a qualified attorney can spot context-specific concerns that an automated first pass may miss.</p></div>`}
               <div class="mt-10 flex justify-center"><button type="button" data-action="reset" data-testid="button-bottom-new-audit" class="primary-button inline-flex items-center gap-2 rounded-full bg-[#226960] px-5 py-3 text-xs font-extrabold text-[#f7f5ec]">Audit another contract ${icons.arrow}</button></div>
@@ -467,6 +505,17 @@
           });
           document.querySelectorAll('[data-action="reset"]').forEach((button) => button.addEventListener('click', reset));
            document.querySelector('[data-action="download-report"]')?.addEventListener('click', downloadReport);
+           document.querySelector('[data-action="copy-email"]')?.addEventListener('click', async (event) => {
+             event.preventDefault();
+             try {
+               await navigator.clipboard.writeText(negotiationEmail);
+               emailCopied = true;
+               renderResults();
+               window.setTimeout(() => { emailCopied = false; renderResults(); }, 1800);
+             } catch {
+               event.currentTarget.textContent = 'Select to copy';
+             }
+           });
         }
 
         async function analyze() {
@@ -511,6 +560,7 @@
           auditResult = null;
            auditTimestamp = null;
           copiedIndex = -1;
+           emailCopied = false;
           errorMessage = '';
           isLoading = false;
           setHeader(false);
