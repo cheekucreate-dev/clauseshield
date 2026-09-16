@@ -168,6 +168,8 @@
         let errorMessage = '';
         let isLoading = false;
         let copiedIndex = -1;
+        let inputMode = 'pdf';
+        let contractText = '';
 
         const icons = {
           arrow: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>',
@@ -245,8 +247,21 @@
             </div>`;
         }
 
+        function pasteMarkup() {
+          return `
+            <div class="relative flex min-h-[285px] flex-col rounded-[22px] border border-[#bfcfc6] bg-[#fbfbf7]/80 px-6 py-6 text-left" data-testid="paste-contract-panel">
+              <label for="contractText" class="text-[13px] font-extrabold text-[#334641]">Paste your contract text</label>
+              <p class="mt-2 text-[12px] leading-5 text-[#87928d]">Paste the clauses you want to review. This skips PDF parsing.</p>
+              <textarea id="contractText" data-testid="textarea-contract-text" class="mt-5 min-h-[155px] w-full resize-y rounded-2xl border border-[#d4ddd6] bg-[#f9faf6] px-4 py-3 text-[13px] leading-6 text-[#334641] outline-none transition focus:border-[#226960] focus:ring-2 focus:ring-[#226960]/15" placeholder="Paste contract language here...">${escapeHTML(contractText)}</textarea>
+              <div class="mt-3 flex items-center justify-between gap-3 text-[10px] text-[#87928d]"><span>Text is used only for this audit</span><span id="textCount" class="mono">${contractText.length.toLocaleString()} characters</span></div>
+            </div>`;
+        }
+
         function renderHome() {
           setHeader(false);
+          const sourceReady = inputMode === 'pdf'
+            ? Boolean(selectedFile)
+            : contractText.trim().length > 0;
           appView.innerHTML = `
             <div class="fade-up">
               <div class="mb-12 max-w-[720px]">
@@ -255,7 +270,13 @@
                 <p class="mt-7 max-w-[520px] text-[15px] leading-7 text-[#65736f] sm:text-[17px]">Upload a contract and get a plain-English read on the clauses that could cost you time, money, or control.</p>
               </div>
               <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
-                ${uploadMarkup()}
+                <div>
+                  <div class="mb-4 inline-flex rounded-xl border border-[#deded4] bg-[#f2f1e8]/75 p-1" role="tablist" aria-label="Contract input method">
+                    <button type="button" data-action="mode-pdf" role="tab" aria-selected="${inputMode === 'pdf'}" class="rounded-lg px-4 py-2 text-[11px] font-extrabold ${inputMode === 'pdf' ? 'bg-[#226960] text-[#f7f5ec]' : 'text-[#70807a]'}">Upload PDF</button>
+                    <button type="button" data-action="mode-text" role="tab" aria-selected="${inputMode === 'text'}" class="rounded-lg px-4 py-2 text-[11px] font-extrabold ${inputMode === 'text' ? 'bg-[#226960] text-[#f7f5ec]' : 'text-[#70807a]'}">Paste text</button>
+                  </div>
+                  ${inputMode === 'pdf' ? uploadMarkup() : pasteMarkup()}
+                </div>
                 <aside class="rounded-[22px] border border-[#deded4] bg-[#f2f1e8]/75 p-6 lg:mt-10">
                   <div class="mb-6 flex h-10 w-10 items-center justify-center rounded-xl bg-[#dfece5] text-[#226960]"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M11 8v6M8 11h6"/></svg></div>
                   <h2 class="text-[14px] font-extrabold tracking-[-.02em] text-[#2c403c]">What we look for</h2>
@@ -263,14 +284,14 @@
                   <div class="mt-7 border-t border-[#dbddd3] pt-5 text-[11px] leading-5 text-[#7a837e]">A useful first pass — not a substitute for advice from a qualified attorney.</div>
                 </aside>
               </div>
-              ${selectedFile ? `<div class="mx-auto mt-6 max-w-[940px]">
+              ${sourceReady ? `<div class="mx-auto mt-6 max-w-[940px]">
                 <div class="flex items-center justify-between gap-3 rounded-2xl border border-[#c6ded5] bg-[#edf6f1] px-4 py-3.5">
-                  <div class="flex min-w-0 items-center gap-3"><div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#d4ebe2] text-[#226960]">${icons.file}</div><div class="min-w-0 text-left"><div class="truncate text-[13px] font-extrabold text-[#304541]">${escapeHTML(selectedFile.name)}</div><div class="mono mt-1 text-[10px] text-[#6c8980]">${formatBytes(selectedFile.size)} · PDF document</div></div></div>
-                  <button type="button" data-action="remove-file" data-testid="button-remove-contract" class="ghost-button rounded-full p-2 text-[#77938a]" aria-label="Remove selected contract">${icons.x}</button>
+                  <div class="flex min-w-0 items-center gap-3"><div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#d4ebe2] text-[#226960]">${icons.file}</div><div class="min-w-0 text-left"><div class="truncate text-[13px] font-extrabold text-[#304541]">${inputMode === 'pdf' ? escapeHTML(selectedFile.name) : 'Pasted contract text'}</div><div class="mono mt-1 text-[10px] text-[#6c8980]">${inputMode === 'pdf' ? `${formatBytes(selectedFile.size)} · PDF document` : `${contractText.trim().length.toLocaleString()} characters · pasted text`}</div></div></div>
+                  <button type="button" data-action="remove-source" data-testid="button-remove-contract" class="ghost-button rounded-full p-2 text-[#77938a]" aria-label="Remove selected contract">${icons.x}</button>
                 </div>
                 <div class="mt-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end"><span class="flex items-center justify-center gap-2 text-[11px] text-[#7c8781]">${icons.checkCircle} Ready for a focused first pass</span><button type="button" data-action="analyze" data-testid="button-analyze-contract" class="primary-button coral-button inline-flex items-center justify-center gap-2 rounded-full bg-[#c96b52] px-6 py-3.5 text-[12px] font-extrabold text-[#fff8f1]">Analyze contract ${icons.arrow}</button></div>
               </div>` : ''}
-              <div class="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3 text-[11px] font-semibold text-[#7c8781]"><span class="flex items-center gap-2">Your file is used for this audit only</span><span class="flex items-center gap-2">PDF files up to 20 MB</span></div>
+              <div class="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3 text-[11px] font-semibold text-[#7c8781]"><span class="flex items-center gap-2">Your input is used for this audit only</span><span class="flex items-center gap-2">PDF files up to 15 MB or pasted text</span></div>
               <div id="errorMessage" role="alert" data-testid="status-analyze-error" class="${errorMessage ? '' : 'hidden'} mx-auto mt-6 flex max-w-[940px] items-start gap-3 rounded-2xl border border-[#edc8bf] bg-[#fff1ed] px-4 py-3.5 text-[12px] leading-5 text-[#9a4d3d]">${errorMessage ? `${icons.alert}<span>${escapeHTML(errorMessage)}</span><button type="button" data-action="dismiss-error" class="ml-auto rounded p-1 text-[#b76c5d]" aria-label="Dismiss error">${icons.x}</button>` : ''}</div>
             </div>`;
           bindHomeEvents();
@@ -279,10 +300,22 @@
         function bindHomeEvents() {
           const input = document.getElementById('contractFile');
           const dropzone = document.getElementById('dropzone');
+          const textarea = document.getElementById('contractText');
           input?.addEventListener('change', (event) => validateAndSelect(event.target.files?.[0]));
           document.querySelector('[data-action="choose-file"]')?.addEventListener('click', () => input?.click());
-          document.querySelector('[data-action="remove-file"]')?.addEventListener('click', reset);
+          document.querySelector('[data-action="remove-source"]')?.addEventListener('click', () => {
+            selectedFile = null;
+            contractText = '';
+            renderHome();
+          });
           document.querySelector('[data-action="analyze"]')?.addEventListener('click', analyze);
+          document.querySelector('[data-action="mode-pdf"]')?.addEventListener('click', () => { inputMode = 'pdf'; errorMessage = ''; renderHome(); });
+          document.querySelector('[data-action="mode-text"]')?.addEventListener('click', () => { inputMode = 'text'; errorMessage = ''; renderHome(); });
+          textarea?.addEventListener('input', (event) => {
+            contractText = event.target.value;
+            const textCount = document.getElementById('textCount');
+            if (textCount) textCount.textContent = `${contractText.length.toLocaleString()} characters`;
+          });
           document.querySelector('[data-action="dismiss-error"]')?.addEventListener('click', () => { errorMessage = ''; renderHome(); });
           dropzone?.addEventListener('dragover', (event) => { event.preventDefault(); dropzone.classList.add('dragging'); });
           dropzone?.addEventListener('dragleave', () => dropzone.classList.remove('dragging'));
@@ -355,13 +388,20 @@
         }
 
         async function analyze() {
-          if (!selectedFile) return;
+          const hasSource = inputMode === 'pdf'
+            ? Boolean(selectedFile)
+            : contractText.trim().length > 0;
+          if (!hasSource) return;
           isLoading = true;
           errorMessage = '';
           renderLoading();
           try {
             const formData = new FormData();
-            formData.append('contract', selectedFile);
+            if (inputMode === 'pdf') {
+              formData.append('contract', selectedFile);
+            } else {
+              formData.append('contractText', contractText);
+            }
             const response = await fetch('/api/analyze', { method: 'POST', body: formData });
             if (!response.ok) {
               let message = 'We could not complete this audit. Please try again.';
@@ -383,6 +423,8 @@
 
         function reset() {
           selectedFile = null;
+          contractText = '';
+          inputMode = 'pdf';
           auditResult = null;
           copiedIndex = -1;
           errorMessage = '';

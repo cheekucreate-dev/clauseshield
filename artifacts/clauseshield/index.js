@@ -1,6 +1,6 @@
 import express from "express";
+import Groq from "groq-sdk";
 import multer from "multer";
-import OpenAI from "openai";
 import { PDFParse } from "pdf-parse";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,12 +32,12 @@ const auditSchema = {
   ],
 };
 
-function createOpenAIClient() {
-  const apiKey = process.env.OPENAI_API_KEY;
+function createGroqClient() {
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is not configured.");
+    throw new Error("GROQ_API_KEY is not configured.");
   }
-  return new OpenAI({ apiKey });
+  return new Groq({ apiKey });
 }
 
 function isPdfFile(file) {
@@ -102,27 +102,39 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.post("/api/analyze", upload.single("contract"), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "Upload a contract PDF to analyze." });
-  }
-  if (!isPdfFile(req.file)) {
-    return res.status(400).json({ error: "Only valid PDF files are supported." });
-  }
-
   let parser;
   try {
-    parser = new PDFParse({ data: req.file.buffer });
-    const parsed = await parser.getText();
-    const contractText = parsed.text?.replace(/\s+/g, " ").trim();
+    const pastedText =
+      typeof req.body?.contractText === "string"
+        ? req.body.contractText.replace(/\s+/g, " ").trim()
+        : "";
+    let contractText = pastedText;
+
+    if (!contractText && !req.file) {
+      return res.status(400).json({
+        error: "Upload a contract PDF or paste contract text to analyze.",
+      });
+    }
+    if (!contractText && !isPdfFile(req.file)) {
+      return res.status(400).json({ error: "Only valid PDF files are supported." });
+    }
+
+    if (!contractText && req.file) {
+      parser = new PDFParse({ data: req.file.buffer });
+      const parsed = await parser.getText();
+      contractText = parsed.text?.replace(/\s+/g, " ").trim();
+    }
+
     if (!contractText) {
       return res.status(422).json({
-        error: "No readable text was found in this PDF. Try an OCR-enabled PDF.",
+        error:
+          "No readable text was found in this PDF. Try an OCR-enabled PDF or paste the contract text.",
       });
     }
 
-    const client = createOpenAIClient();
+    const client = createGroqClient();
     const response = await client.chat.completions.create({
-      model: "gpt-4o",
+      model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
       temperature: 0.1,
       response_format: { type: "json_object" },
       messages: [
@@ -155,18 +167,12 @@ ${contractText.slice(0, 120000)}`,
     }
     return res.json(validateAuditResult(parseJsonResponse(content)));
   } catch (error) {
-    if (error instanceof SyntaxError) {
-      return res.status(502).json({ error: "The audit response was not valid JSON." });
-    }
-    if (error instanceof Error && error.message === "OPENAI_API_KEY is not configured.") {
-      return res.status(503).json({
-        error: "OpenAI is not configured yet. Add OPENAI_API_KEY in Secrets and try again.",
-      });
-    }
-    console.error("Contract analysis failed:", error);
-    return res.status(500).json({
-      error: "The contract could not be analyzed. Check the PDF and try again.",
-    });
+    const exactMessage =
+      error instanceof Error ? error.message : String(error);
+    console.error("Contract analysis failed:", exactMessage, error);
+    const statusCode =
+      exactMessage === "GROQ_API_KEY is not configured." ? 503 : 502;
+    return res.status(statusCode).json({ error: exactMessage });
   } finally {
     await parser?.destroy().catch(() => undefined);
   }
@@ -176,8 +182,9 @@ app.use((error, _req, res, _next) => {
   if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
     return res.status(413).json({ error: "PDFs must be 15 MB or smaller." });
   }
-  console.error("Request failed:", error);
-  return res.status(500).json({ error: "Something went wrong. Please try again." });
+  const exactMessage = error instanceof Error ? error.message : String(error);
+  console.error("Request failed:", exactMessage, error);
+  return res.status(500).json({ error: exactMessage });
 });
 
 app.listen(port, "0.0.0.0", () => {

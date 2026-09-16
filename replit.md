@@ -23,7 +23,7 @@ ClauseShield audits uploaded contract PDFs for common business traps and returns
 
 ## Where things live
 
-- `artifacts/clauseshield/index.js` — Express server, PDF extraction, OpenAI audit, and `/api/analyze`
+- `artifacts/clauseshield/index.js` — Express server, PDF extraction, Groq audit, and `/api/analyze`
 - `artifacts/clauseshield/public/index.html` — self-contained Tailwind dashboard served by Express
 - `artifacts/clauseshield/.replit-artifact/artifact.toml` — app routing and development/production service configuration
 
@@ -42,7 +42,7 @@ ClauseShield audits uploaded contract PDFs for common business traps and returns
 ## Gotchas
 
 - ClauseShield owns the `/api` route prefix; the generic API scaffold is mapped to `/system-api` to avoid proxy collisions.
-- `OPENAI_API_KEY` must be present in Replit Secrets for audits to run.
+- `GROQ_API_KEY` must be present in Replit Secrets for audits to run. The default production model is `openai/gpt-oss-120b`; set `GROQ_MODEL` only when using another model available to the account.
 
 ## Pointers
 

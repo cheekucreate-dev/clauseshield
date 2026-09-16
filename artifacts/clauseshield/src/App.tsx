@@ -359,6 +359,7 @@ function Results({ result, file, onReset }: { result: AuditResult; file: File; o
 
 function App() {
   const [file, setFile] = useState<File | null>(null);
+  const [pastedText, setPastedText] = useState('');
   const [result, setResult] = useState<AuditResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -368,16 +369,6 @@ function App() {
     if (input) {
       const fileFromInput = input.files?.[0];
       if (fileFromInput) {
-        if (fileFromInput.type !== 'application/pdf' && !fileFromInput.name.toLowerCase().endsWith('.pdf')) {
-          setError('Please choose a PDF file. ClauseShield reads contracts in PDF format for now.');
-          setFile(null);
-          return;
-        }
-        if (fileFromInput.size > 20 * 1024 * 1024) {
-          setError('That PDF is over the 20 MB limit. Try exporting a smaller copy and upload again.');
-          setFile(null);
-          return;
-        }
         setError('');
         setFile(fileFromInput);
       }
@@ -386,6 +377,7 @@ function App() {
 
   const reset = () => {
     setFile(null);
+    setPastedText('');
     setResult(null);
     setError('');
     const input = document.querySelector<HTMLInputElement>('[data-testid="input-contract-file"]');
@@ -393,64 +385,104 @@ function App() {
   };
 
   const analyze = async () => {
-    if (!file) return;
+    if (!file && !pastedText.trim()) {
+      setError('Please choose a PDF file or paste contract text.');
+      return;
+    }
+
     setLoading(true);
     setError('');
+
     try {
-      const formData = new FormData();
-      formData.append('contract', file);
-      const response = await fetch('/api/analyze', { method: 'POST', body: formData });
+      let response: Response;
+      if (pastedText.trim()) {
+        response = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contractText: pastedText }),
+        });
+      } else {
+        const formData = new FormData();
+        if (file) formData.append('contract', file);
+        response = await fetch('/api/analyze', { method: 'POST', body: formData });
+      }
+
       if (!response.ok) {
-        let message = 'We could not complete this audit. Please try again.';
+        let message = 'We could not complete this audit. Please check your API key.';
         try {
-          const body = await response.json() as { message?: string; error?: string };
+          const body = (await response.json()) as { message?: string; error?: string };
           message = body.message || body.error || message;
         } catch {
-          // Keep the useful fallback for non-JSON server errors.
+          // ignore
         }
         throw new Error(message);
       }
-      const body = await response.json() as AuditResult;
-      setResult(body);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Something went wrong while auditing your contract.');
+
+      const data = (await response.json()) as AuditResult;
+      setResult(data);
+    } catch (err: any) {
+      setError(err.message || 'Audit failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="app-shell">
+    <div className="min-h-screen bg-[#f7f6f0] text-[#2c3e3a]">
       <Header onReset={reset} hasResult={Boolean(result)} />
-      <main className="content-layer mx-auto w-full max-w-[1240px] px-5 pb-16 pt-9 sm:px-8 sm:pb-24 sm:pt-16 lg:px-10">
-        {loading ? <LoadingAudit fileName={file?.name || 'your contract'} /> : result && file ? <Results result={result} file={file} onReset={reset} /> : (
-          <div>
+
+      <main className="mx-auto max-w-[1240px] px-5 py-8 sm:px-8 lg:px-10">
+        {loading && <LoadingAudit fileName={file?.name || 'Pasted Contract'} />}
+
+        {!loading && result && (
+          <Results result={result} file={file || new File([], 'pasted-contract.txt')} onReset={reset} />
+        )}
+
+        {!loading && !result && (
+          <div className="fade-up">
             <EmptyState onSelect={selectFile} />
+
             {file && (
-              <div className="mx-auto mt-6 max-w-[940px]">
-                <FilePreview file={file} onRemove={reset} />
-                <div className="mt-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
-                  <span className="flex items-center justify-center gap-2 text-[11px] text-[#7c8781]"><CheckCircle2 size={14} className="text-[#317a6e]" /> Ready for a focused first pass</span>
-                  <button type="button" onClick={analyze} disabled={!file} data-testid="button-analyze-contract" className="primary-button inline-flex items-center justify-center gap-2 rounded-full bg-[#c96b52] px-6 py-3.5 text-[12px] font-extrabold text-[#fff8f1]">
-                    Analyze contract <ArrowRight size={16} />
-                  </button>
-                </div>
+              <div className="mx-auto mt-6 max-w-[500px]">
+                <FilePreview file={file} onRemove={() => setFile(null)} />
               </div>
             )}
+
+            <div className="mx-auto mt-8 max-w-[600px]">
+              <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-[#d8dad0]"></div>
+                <span className="flex-shrink mx-4 text-xs font-bold uppercase tracking-wider text-[#8b9893]">OR PASTE CONTRACT TEXT</span>
+                <div className="flex-grow border-t border-[#d8dad0]"></div>
+              </div>
+
+              <textarea
+                value={pastedText}
+                onChange={(e) => setPastedText(e.target.value)}
+                placeholder="Paste your contract clauses or entire agreement here..."
+                rows={5}
+                className="mt-3 w-full rounded-2xl border border-[#c8ded5] bg-[#fffefa] p-4 text-xs font-mono text-[#2c403c] placeholder-[#95a39d] focus:border-[#226960] focus:outline-none"
+              />
+            </div>
+
             {error && (
-              <div role="alert" data-testid="status-analyze-error" className="mx-auto mt-6 flex max-w-[940px] items-start gap-3 rounded-2xl border border-[#edc8bf] bg-[#fff1ed] px-4 py-3.5 text-[12px] leading-5 text-[#9a4d3d]">
-                <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-                <span>{error}</span>
-                <button type="button" onClick={() => setError('')} data-testid="button-dismiss-error" className="ml-auto rounded p-1 text-[#b76c5d]"><X size={15} /></button>
+              <div className="mx-auto mt-4 max-w-[500px] rounded-xl border border-[#f1b29e] bg-[#fdf0e7] p-3 text-center text-xs font-semibold text-[#b15c3f]">
+                {error}
               </div>
             )}
+
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={analyze}
+                disabled={!file && !pastedText.trim()}
+                className="primary-button inline-flex items-center gap-2 rounded-full bg-[#226960] px-8 py-3.5 text-sm font-extrabold text-[#f7f5ec] transition hover:bg-[#1a534c] disabled:opacity-50"
+              >
+                Analyze Contract <ArrowRight size={16} />
+              </button>
+            </div>
           </div>
         )}
       </main>
-      <footer className="content-layer mx-auto flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-4 border-t border-[#dddcd2] px-5 py-6 text-[10px] text-[#8b948e] sm:px-8 lg:px-10">
-        <span className="mono tracking-[.08em]">CLAUSESHIELD / PRIVATE CONTRACT REVIEW</span>
-        <span className="flex items-center gap-2"><LockKeyhole size={12} /> Not legal advice · Built for clearer conversations</span>
-      </footer>
     </div>
   );
 }
