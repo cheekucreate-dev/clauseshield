@@ -613,15 +613,30 @@
     renderHome();
 
     window.triggerRazorpayPayment = function() {
-  // Current audit data save karein taaki redirect ke baad result gayab na ho
+  const isVipUser = sessionStorage.getItem('clauseshield_vip_user') === 'true';
+
+  if (isVipUser) {
+    // VIP users ke liye direct unlock
+    if (auditResult) {
+      renderResults();
+      setTimeout(() => {
+        const container = document.getElementById('locked-issues-container');
+        if (container) container.classList.remove('filter', 'blur-md', 'select-none', 'pointer-events-none');
+        const paywallCard = document.getElementById('paywall-card');
+        if (paywallCard) paywallCard.style.display = 'none';
+      }, 100);
+    }
+    return;
+  }
+
+  // Normal users ke liye Dodo Checkout
   if (auditResult) {
     sessionStorage.setItem('clauseshield_saved_audit', JSON.stringify(auditResult));
     sessionStorage.setItem('clauseshield_saved_time', auditTimestamp || new Date().toISOString());
   }
 
-  // Dodo checkout par bhejein
   const returnUrl = window.location.origin + window.location.pathname + '?payment=success';
-window.location.href = 'https://checkout.dodopayments.com/buy/pdt_0Nnrgb80mF6JUOphMPWZY?quantity=1&redirect_url=' + encodeURIComponent(returnUrl);
+  window.location.href = 'https://checkout.dodopayments.com/buy/pdt_0Nnrgb80mF6JUOphMPWZY?quantity=1&redirect_url=' + encodeURIComponent(returnUrl);
 };
 
 // Payment complete karke wapas aane par report unlock karna
