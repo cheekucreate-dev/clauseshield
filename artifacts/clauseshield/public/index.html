@@ -625,10 +625,18 @@ window.location.href = 'https://checkout.dodopayments.com/buy/pdt_0Nnrgb80mF6JUO
 };
 
 // Payment complete karke wapas aane par report unlock karna
+// Secret VIP Link check
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('access') === 'vip_cheeku') {
+  sessionStorage.setItem('clauseshield_vip_user', 'true');
+}
+
+// Payment complete ya VIP access par report unlock karna
 (function checkPaymentSuccess() {
   const params = new URLSearchParams(window.location.search);
-  if (params.get('payment') === 'success') {
-    const savedData = sessionStorage.getItem('clauseshield_saved_audit');
+  const isVipUser = sessionStorage.getItem('clauseshield_vip_user') === 'true';
+
+  if (params.get('payment') === 'success' || isVipUser) {
     const savedTime = sessionStorage.getItem('clauseshield_saved_time');
 
     if (savedData) {
